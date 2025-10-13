@@ -1,10 +1,10 @@
-### SolsticeOS
+# SolsticeOS
 
 A custom bare-bones operating system running on 32-bit protected mode, complete with a custom bootloader, gdt, and stack implementation
 I am using the printf function here  -> [A simple printf implimentation](https://github.com/mpaland/printf/tree/master).
 
 
-# Dependencies
+### Dependencies
 
 [mkisofs](https://wiki.osdev.org/Mkisofs)
 
@@ -14,7 +14,7 @@ I am using the printf function here  -> [A simple printf implimentation](https:/
 
 [i386-elf-gcc](https://gcc.gnu.org/)
 
-# Running the Operating System
+### Running the Operating System
 
 To run, download the files and run:
 
