@@ -8,7 +8,7 @@ I am using the printf function here  -> [A simple printf implimentation](https:/
 
 [mkisofs](https://wiki.osdev.org/Mkisofs)
 
-[nasm](https://www.nasm.us)
+[nasm](https://www.nasm.us) (note that the website is a bit confusing, but you can download it from most package managers!)
 
 [qemu](https://www.qemu.org)
 
