@@ -17,9 +17,9 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
 [i386-elf-gcc](https://gcc.gnu.org/)
 
 Or just run
-`sudo pacman -Syyu i386-elf-gcc qemu nasm cdrtools` on arch
+`yay -Syyu i386-elf-gcc qemu nasm cdrtools` on arch
 
-and `sudo apt update && sudo apt install nasm genisoimage qemu-system-x86` on debian/ubuntu
+and `sudo apt update && sudo apt install nasm genisoimage qemu-system-x86` on debian/ubuntu, and build i386-elf-gcc for yourself
 
 ### Running the Operating System
 
