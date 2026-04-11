@@ -16,7 +16,7 @@ I am using the printf function here  -> [A simple printf implimentation](https:/
 
 ### Running the Operating System
 
-To run, download the files and run:
+To run, clone the repo and run:
 
 make
 
