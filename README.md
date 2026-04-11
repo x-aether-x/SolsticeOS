@@ -18,7 +18,8 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
 
 Or just run
 `sudo pacman -Syyu i386-elf-gcc qemu nasm mkisofs` on arch
-`sudo apt update && sudo apt install nasm genisoimage qemu-system-x86` on debian/ubuntu
+
+and `sudo apt update && sudo apt install nasm genisoimage qemu-system-x86` on debian/ubuntu
 
 ### Running the Operating System
 
