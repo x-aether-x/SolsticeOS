@@ -1,0 +1,21 @@
+{
+  "configurations": [
+    {
+      "name": "Linux",
+      "includePath": [
+        "${workspaceFolder}/src/include",
+        "${workspaceFolder}/src/kernel",
+        "${workspaceFolder}/src/kernel/gdt",
+        "${workspaceFolder}/src/kernel/utils",
+        "${workspaceFolder}/src/kernel/misc",
+        "${workspaceFolder}/**"
+      ],
+      "defines": [],
+      "compilerPath": "/usr/bin/g++",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "linux-gcc-x64"
+    }
+  ],
+  "version": 4
+}
