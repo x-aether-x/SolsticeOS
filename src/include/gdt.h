@@ -1,4 +1,4 @@
-#pragma once
+#pragma once // idk why it needs to be once here but i kept getting errors about it just trust the process
 #include <stdint.h>
 
 struct gdt_entry_struct{
