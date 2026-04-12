@@ -1,24 +1,24 @@
 #pragma once // idk why it needs to be once here but i kept getting errors about it just trust the process
 #include <stdint.h>
 
-struct gdt_entry_struct{
+struct gdt_entry_struct{ // gdt entry struct used to define segments into gdt
   uint16_t limit;
   uint16_t base_low;
   uint8_t base_middle;
   uint8_t access;
   uint8_t flags;
   uint8_t base_high;
-}__attribute__((packed));
+}__attribute__((packed)); // telling compiler not to optimize struct, which sometimes breaks code
 
-struct gdt_ptr_struct{
+struct gdt_ptr_struct{ // pointer to the gdt
   uint16_t limit;
   unsigned int base;
-}__attribute__((packed));
+}__attribute__((packed)); 
 
-struct tss_entry_struct{
-  uint32_t prev_tss;
-  uint32_t esp0;
-  uint32_t ss0;
+struct tss_entry_struct{ // task state segment struct (tss) used for task info
+  uint32_t prev_tss; // previous tss
+  uint32_t esp0; // stack pointer for loading when going into kernel mode
+  uint32_t ss0; // stack segment for loading when going into kernel mode
   uint32_t esp1;
   uint32_t ss1;
   uint32_t esp2;
@@ -41,7 +41,7 @@ struct tss_entry_struct{
   uint32_t gs;
   uint32_t ldt;
   uint32_t trap;
-  uint32_t iomap_base; 
+  uint32_t iomap_base;
 }__attribute__((packed));
 
 void initGdt();

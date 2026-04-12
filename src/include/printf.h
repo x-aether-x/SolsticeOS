@@ -1,3 +1,6 @@
+// NOTE: NOT MY CODE!
+
+
 ///////////////////////////////////////////////////////////////////////////////
 // \author (c) Marco Paland (info@paland.com)
 //             2014-2019, PALANDesign Hannover, Germany

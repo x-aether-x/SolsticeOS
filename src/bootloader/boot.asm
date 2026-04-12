@@ -1,4 +1,4 @@
-[org 0x7c00]
+[org 0x7c00] ; custom bootloader i made idk if its any good but it works
 KERNEL_LOCATION equ 0x1000
 
 mov [BOOT_DISK], dl

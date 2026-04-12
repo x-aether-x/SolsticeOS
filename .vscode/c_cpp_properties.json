@@ -1,4 +1,4 @@
-{
+{ // used so that vscode can understand more about the project and stop giving me errors about missing header files
   "configurations": [
     {
       "name": "Linux",
