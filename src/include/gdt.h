@@ -44,6 +44,6 @@ struct tss_entry_struct{ // task state segment struct (tss) used for task info
   uint32_t iomap_base;
 }__attribute__((packed));
 
-void initGdt();
-void setGdtGate(uint32_t num, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran);
-void writeTSS(uint32_t num, uint16_t ss0, uint32_t esp0);
+void initGdt(); // set gdt init function
+void setGdtGate(uint32_t num, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran); // set gdt gate function
+void writeTSS(uint32_t num, uint16_t ss0, uint32_t esp0); // set tss function

@@ -2,7 +2,7 @@
 #include "gdt.h"
 #include "utils.h"
 extern "C" {
-    void gdt_flush(uint32_t); // had name mangling issues, so declared it in c
+    void gdt_flush(uint32_t); // had name mangling issues, so declared these in c
     void tss_flush();
 }
 
