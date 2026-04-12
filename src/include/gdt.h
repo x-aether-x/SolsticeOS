@@ -1,4 +1,6 @@
-#pragma once // idk why it needs to be once here but i kept getting errors about it just trust the process
+// header file for the gdt
+
+#pragma once // helps avoid naming errors 
 #include <stdint.h>
 
 struct gdt_entry_struct{ // gdt entry struct used to define segments into gdt

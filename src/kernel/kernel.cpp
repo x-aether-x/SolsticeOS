@@ -2,6 +2,7 @@
 #include "io.h"
 #include "utils.h"
 #include "gdt.h"
+#include "idt.h"
 
 #define SERIAL_PORT 0x3F8 // COM1
 
@@ -25,7 +26,7 @@ int main() {
     init_serial();
     initGdt();
     printf("GDT initialised \n");
-    _putchar('>'); // just some testing, can't remember why I did this but it must be important ^_^
+    _putchar('>'); // alternative printf for testing serial port 
     vga_print("########################################\n"
               "##            Solstice OS             ##\n"
               "########################################\n"
