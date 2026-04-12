@@ -1,4 +1,4 @@
-#pragma
+#pragma once
 #include <stdint.h>
 
 struct gdt_entry_struct{

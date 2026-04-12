@@ -1,9 +1,10 @@
 #include <stdint.h>
 #include "gdt.h"
-#include "../utils/utils.h"
-
-extern void gdt_flush(uint32_t);
-extern void tss_flush();
+#include "utils.h"
+extern "C" {
+    void gdt_flush(uint32_t); // had name mangling issues, so declared it in c
+    void tss_flush();
+}
 
 struct gdt_entry_struct gdt_entries[6];
 struct gdt_ptr_struct gdt_ptr;

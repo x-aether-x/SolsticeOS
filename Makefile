@@ -1,36 +1,68 @@
-all: clean zeroes includes kernel boot image
+INCLUDES_DIR = src/kernel/include
+
+CXX = i386-elf-g++
+AS  = nasm
+LD  = i386-elf-g++
+OBJCOPY = i386-elf-objcopy
+
+SRC_DIR = src/kernel
+INC_DIR = src/include
+BUILD_DIR = build
+
+CXXFLAGS = -ffreestanding -m32 -g -Wall -Wextra \
+           -fno-exceptions -fno-rtti -fno-use-cxa-atexit \
+           -I$(INC_DIR)
+
+ASFLAGS = -f elf
+LDFLAGS = -ffreestanding -m32 -g -nostdlib -nostartfiles -Ttext 0x1000
+
+OBJS = $(BUILD_DIR)/kernel_entry.o \
+       $(BUILD_DIR)/kernel.o \
+       $(BUILD_DIR)/printf.o \
+       $(BUILD_DIR)/gdtc.o \
+       $(BUILD_DIR)/gdts.o \
+       $(BUILD_DIR)/utils.o
+
+all: $(BUILD_DIR)/SolsticeOS.iso
+
+$(BUILD_DIR)/gdtc.o: $(SRC_DIR)/gdt/gdt.cpp
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/utils.o: $(SRC_DIR)/utils/utils.cpp
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# kernel ovveride
+$(BUILD_DIR)/kernel.o: $(SRC_DIR)/kernel.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/printf.o: $(SRC_DIR)/misc/printf.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# compile assembly files
+$(BUILD_DIR)/gdts.o: $(SRC_DIR)/gdt/gdt.s
+	$(AS) $(ASFLAGS) $< -o $@
+
+$(BUILD_DIR)/kernel_entry.o: $(SRC_DIR)/kernel_entry.asm
+	$(AS) $(ASFLAGS) $< -o $@
+
+# link kernel
+$(BUILD_DIR)/complete_kernel.elf: $(OBJS)
+	$(LD) $(LDFLAGS) -o $@ $(OBJS) $(shell $(CXX) -print-libgcc-file-name)
+
+# create iso image
+$(BUILD_DIR)/SolsticeOS.iso: $(BUILD_DIR)/complete_kernel.elf
+	$(OBJCOPY) -O binary $(BUILD_DIR)/complete_kernel.elf $(BUILD_DIR)/kernel.bin
+	$(AS) -f bin src/bootloader/boot.asm -o $(BUILD_DIR)/boot.bin
+	$(AS) -f bin src/other/zeroes.asm -o $(BUILD_DIR)/zeroes.bin
+	# concatenate all to create final binary
+	cat $(BUILD_DIR)/boot.bin $(BUILD_DIR)/kernel.bin $(BUILD_DIR)/zeroes.bin > $(BUILD_DIR)/SolsticeOS.bin
+	# make iso
+	mkisofs -o $@ $(BUILD_DIR)/SolsticeOS.bin
 
 clean:
-	rm -rf build
-	mkdir build
+	rm -rf $(BUILD_DIR)
+	mkdir -p build
 
-zeroes:
-	nasm src/other/zeroes.asm -f bin -o build/zeroes.bin
-
-includes:
-	i386-elf-gcc -ffreestanding -m32 -g -c src/kernel/include/printf.c -o build/printf.o
-	echo "Printf object created"
-	i386-elf-gcc -ffreestanding -m32 -g -c src/kernel/gdt/gdt.c -o build/gdtc.o
-	nasm src/kernel/gdt/gdt.s -f elf -o build/gdts.o
-	echo "GDT OBJECT CREATED"
-	i386-elf-gcc -ffreestanding -m32 -g -c src/kernel/utils/utils.c -o build/utils.o
-	echo "Utils object created"
-
-
-kernel:
-	i386-elf-gcc -ffreestanding -m32 -g -c src/kernel/kernel.c -o build/kernel.o
-	echo "Kernel object created"
-	nasm src/kernel/kernel_entry.asm -f elf -o build/kernel_entry.o 
-	echo "Kernel entry object created"
-	i386-elf-gcc -ffreestanding -m32 -g -nostdlib -nostartfiles -Ttext 0x1000 -o build/complete_kernel.elf build/kernel_entry.o build/kernel.o build/printf.o build/gdtc.o build/gdts.o build/utils.o $(shell i386-elf-gcc -print-libgcc-file-name)
-	echo "Kernel linked to kernel entry and includes"
-
-boot:
-	nasm src/bootloader/boot.asm -f bin -o build/boot.bin
-
-image:
-	i386-elf-objcopy -O binary $< build/complete_kernel.elf
-	cat build/boot.bin build/complete_kernel.elf > build/everything.bin
-	cat build/everything.bin build/zeroes.bin > "build/SolsticeOS.bin"
-	echo "Final disk image created: build/SolsticeOS.iso"
-	mkisofs -o build/SolsticeOS.iso build/SolsticeOS.bin
+.PHONY: all clean
