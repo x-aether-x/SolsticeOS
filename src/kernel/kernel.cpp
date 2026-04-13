@@ -26,13 +26,21 @@ int main() {
     init_serial();
     initGdt();
     printf("GDT initialised \n");
+    initIdt();
+    printf("IDT initialised \n");
+
+    remap_pic(); // remap pic to allow keyboard interrupts
+    printf("PIC remapped, enabling IDT... \n");
+    
+    asm volatile ("sti"); // enable interrupts
+    outb(0x21, 0xFD); // unmask keyboard interrupts
+
     _putchar('>'); // alternative printf for testing serial port 
     vga_print("########################################\n"
               "##            Solstice OS             ##\n"
               "########################################\n"
               "\n"
               );
-  
 
     while (1) {}
     return 1;

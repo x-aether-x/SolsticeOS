@@ -1,3 +1,6 @@
+// gdt sets up the global descriptor table used to define what memory segments you can read and write
+// it also sets up the task state segment used for task info and switching tasks
+
 #include <stdint.h>
 #include "gdt.h"
 #include "utils.h"
