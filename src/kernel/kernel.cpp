@@ -32,8 +32,8 @@ int main() {
     remap_pic(); // remap pic to allow keyboard interrupts
     printf("PIC remapped, enabling IDT... \n");
     
-    asm volatile ("sti"); // enable interrupts
-    outb(0x21, 0xFD); // unmask keyboard interrupts
+    outb(0x21, 0xFD); // unmask keyboard interrupts 
+    asm volatile ("sti"); // enable interrupt
 
     _putchar('>'); // alternative printf for testing serial port 
     vga_print("########################################\n"
