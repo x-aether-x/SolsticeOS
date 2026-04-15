@@ -6,4 +6,5 @@ extern "C" void memset(void *dest, char val, uint32_t count); // set block of me
 void vga_print(const char *str); // set vga_print 
 
 void remap_pic(); // remap the PIC interrupt vectors
-void remap_pic(); // remap pic to allow keyboard interrupts
+
+char scancode_to_ascii(uint8_t scancode);

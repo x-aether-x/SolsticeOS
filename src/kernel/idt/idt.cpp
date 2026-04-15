@@ -93,8 +93,10 @@ extern "C" void interrupt_handler(struct registers* regs) {
         outb(0x20, 0x20); // send eoi to master
     }
     
-    // Keyboard interrupt handling
+    // getting scancodes from keyboard
     uint8_t scancode = inb(0x60);
+
+
     printf("Scancode: %02x\n", scancode);
 }
 
