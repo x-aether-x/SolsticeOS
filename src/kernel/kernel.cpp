@@ -16,8 +16,7 @@ void init_serial() {
     outb(SERIAL_PORT + 4, 0x0B); // IRQs enabled, RTS/DSR set
 }
 
-void _putchar(char c) {
-    // Wait until the transmit buffer is empty, then write the character.
+void _putchar(char c) { // helper function for printf
     while ((inb(SERIAL_PORT + 5) & 0x20) == 0);
     outb(SERIAL_PORT, c);
 }
@@ -32,14 +31,15 @@ int main() {
     remap_pic(); // remap pic to allow keyboard interrupts
     printf("PIC remapped, enabling IDT... \n");
     
-    outb(0x21, 0xFD); // unmask keyboard interrupts 
-    asm volatile ("sti"); // enable interrupt
+    outb(0x21, 0xFD); // unmask keyboard interrupts
 
-    _putchar('>'); // alternative printf for testing serial port 
-    vga_print("########################################\n"
-              "##            Solstice OS             ##\n"
-              "########################################\n"
-              "\n"
+    asm volatile ("sti"); // enable interrupt
+    printf("Interrupts enabled \n");
+
+    vga_print("========================================\n"
+              "==            Solstice OS             ==\n" // switched to eqals signs cos it looks nicer
+              "========================================\n"
+              "\n", 0x02, 0x00 // green text on black background
               );
 
     while (1) {}
