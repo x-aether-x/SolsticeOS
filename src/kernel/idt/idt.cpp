@@ -6,6 +6,8 @@
 #include "printf.h"
 #include "io.h"
 
+char scancodes_ascii[256] = {0};
+
 extern "C" {
     idt_entry_struct idt_entries[256];
     idt_ptr_struct idt_ptr;
@@ -96,7 +98,35 @@ extern "C" void interrupt_handler(struct registers* regs) {
     // getting scancodes from keyboard
     uint8_t scancode = inb(0x60);
 
+    scancodes_ascii[0x1E] = 'a';
+    scancodes_ascii[0x30] = 'b';
+    scancodes_ascii[0x2E] = 'c';
+    scancodes_ascii[0x20] = 'd';
+    scancodes_ascii[0x12] = 'e';
+    scancodes_ascii[0x21] = 'f';
+    scancodes_ascii[0x22] = 'g';
+    scancodes_ascii[0x23] = 'h';
+    scancodes_ascii[0x17] = 'i';
+    scancodes_ascii[0x24] = 'j';
+    scancodes_ascii[0x25] = 'k';
+    scancodes_ascii[0x26] = 'l';
+    scancodes_ascii[0x32] = 'm';
+    scancodes_ascii[0x31] = 'n';
+    scancodes_ascii[0x18] = 'o';
+    scancodes_ascii[0x19] = 'p';
+    scancodes_ascii[0x10] = 'q';
+    scancodes_ascii[0x13] = 'r';
+    scancodes_ascii[0x1F] = 's';
+    scancodes_ascii[0x14] = 't';
+    scancodes_ascii[0x16] = 'u';
+    scancodes_ascii[0x2F] = 'v';
+    scancodes_ascii[0x11] = 'w';
+    scancodes_ascii[0x2D] = 'x';
+    scancodes_ascii[0x15] = 'y';
+    scancodes_ascii[0x2C] = 'z';
 
     printf("Scancode: %02x\n", scancode);
+    printf("ASCII: %c\n", scancodes_ascii[scancode]);
+    vga_putc(scancodes_ascii[scancode], 0, 0); // print at top left of screen
 }
 

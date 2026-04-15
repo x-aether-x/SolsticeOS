@@ -18,6 +18,11 @@ extern "C" void memset(void *dest, char val, uint32_t count) {
     }
 }
 
+void vga_putc(char c, int row, int col) {
+    unsigned short *vidmem = (unsigned short *)0xB8000;
+    vidmem[row * 80 + col] = (c & 0xFF) | (0x07 << 8);
+}
+
 void vga_print(const char *str) {
     volatile unsigned short *vidmem = (unsigned short *)0xB8000; // VGA text buffer
     int row = 0, col = 0;
