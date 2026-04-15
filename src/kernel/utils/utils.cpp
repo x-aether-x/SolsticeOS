@@ -11,11 +11,11 @@
 #define PIC2_DATA	(PIC2+1)
 
 
-void memset(void *dest, char val, uint32_t count) {
-  char *temp = (char*) dest;
-  for (; count != 0; count --) {
-    *temp++ = val;
-  }
+extern "C" void memset(void *dest, char val, uint32_t count) {
+    char *temp = (char*) dest;
+    for (; count != 0; count --) {
+        *temp++ = val;
+    }
 }
 
 void vga_print(const char *str) {
@@ -54,3 +54,8 @@ void remap_pic() {
     outb(PIC1_DATA, 0xFF);
     outb(PIC2_DATA, 0xFF);
 }
+
+// make a memcpy function
+// make a memcmp function
+// and a memmove function
+// gcc and clang make calls to these funcions, so if u dont have them u get cooked

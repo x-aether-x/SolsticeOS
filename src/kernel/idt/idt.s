@@ -72,7 +72,10 @@ isr_common_stub:
     mov fs, ax
     mov gs, ax
 
+
+    push esp
     call interrupt_handler ; go into c++ code 
+    add esp, 4
 
     pop eax              ; original data segment
     mov ds, ax

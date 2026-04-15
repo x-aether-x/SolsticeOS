@@ -76,13 +76,25 @@ void initIdt() {
     idt_flush((uint32_t)&idt_ptr);
 }
 
-extern "C" void interrupt_handler(uint8_t interrupt_number) {
-    printf("Received Interrupt: %d\n", interrupt_number);
-    if (interrupt_number >= 0x20) {
+struct registers {
+    uint32_t ds;                                     // pushed manually
+    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // pushed by pusha
+    uint32_t int_no, err_code;                       // int number and err code
+    uint32_t eip, cs, eflags, useresp, ss;           // pushed by cpu
+};
+
+extern "C" void interrupt_handler(struct registers* regs) {
+    printf("Received Interrupt: %d\n", regs->int_no);
+    if (regs->int_no >= 0x20) {
         // If it's from the pic, send eoi 
-        if (interrupt_number >= 0x28) {
+        if (regs->int_no >= 0x28) {
             outb(0xA0, 0x20);
         }
         outb(0x20, 0x20); // send eoi to master
     }
+    
+    // Keyboard interrupt handling
+    uint8_t scancode = inb(0x60);
+    printf("Scancode: %02x\n", scancode);
 }
+
