@@ -4,6 +4,7 @@
 %macro ISR_NOERRCODE 1 ; macro for no error code
     [global isr%1]
     isr%1:
+        cli
         push 0              ; fake error code as it doesnt return one
         push %1             ; interrupt number
         jmp isr_common_stub
@@ -12,6 +13,7 @@
 %macro ISR_ERRCODE 1 ; macro for a cpu error code
     [global isr%1]
     isr%1:
+        cli
         ; error code automatically pushed by cpu
         push %1             ; interrupt number
         jmp isr_common_stub
@@ -61,31 +63,33 @@ ISR_NOERRCODE 31
 %endrep
 
 isr_common_stub:
-    pusha                ; save registers
-    
-    mov ax, ds           ; save lower 16 bits of data segment
+    pusha
+
+    mov ax, ds
     push eax
 
-    mov ax, 0x10         ; load kernel data segment 
+    mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
+    mov eax, esp        ; 🔥 point to current stack
+    push eax            ; pass pointer to struct
 
-    push esp
-    call interrupt_handler ; go into c++ code 
+    call interrupt_handler
+
     add esp, 4
 
-    pop eax              ; original data segment
+    pop eax
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
-    popa                 ; restore registers
-    add esp, 8           ; cleans up err code an 
-    iret                 ; return
+    popa
+    add esp, 8
+    iret
 
 idt_flush:
     mov eax, [esp + 4]  ; idt structure pointer (from stack)

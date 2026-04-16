@@ -39,9 +39,9 @@ void initGdt() {
 
 void writeTSS(uint32_t num, uint16_t ss0, uint32_t esp0) {
   uint32_t base = (uint32_t) &tss_entry;
-  uint32_t limit = base + sizeof(&tss_entry);
+  uint32_t limit = base + sizeof(tss_entry);
 
-  setGdtGate(num, base, limit, 0xe9, 0x00);
+  setGdtGate(num, base, limit, 0x89, 0x00);
   memset(&tss_entry, 0, sizeof(tss_entry));
 
   tss_entry.ss0 = ss0;

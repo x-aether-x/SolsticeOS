@@ -17,7 +17,7 @@ struct idt_ptr_struct { // pointer to the idt
 
 struct registers {
     uint32_t ds;                                     // pushed manually
-    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // pushed by pusha
+    uint32_t eax, ecx, edx, ebx, esp, ebp, esi, edi;  // pushed by pusha
     uint32_t int_no, err_code;                       // int number and err code
     uint32_t eip, cs, eflags, useresp, ss;           // pushed by cpu
 }__attribute__((packed));

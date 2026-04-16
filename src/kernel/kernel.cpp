@@ -31,9 +31,12 @@ int main() {
     remap_pic(); // remap pic to allow keyboard interrupts
     printf("PIC remapped, enabling IDT... \n");
     
-    outb(0x21, 0xFD); // unmask keyboard interrupts
+    outb(0x21, 0xFF); // mask all IRQs
+    outb(0xA1, 0xFF);
+    
+    outb(0x21, 0xFD); // unmask keyboard
 
-    asm volatile ("sti"); // enable interrupt
+    asm volatile ("sti"); // enable interrupts
     printf("Interrupts enabled \n");
 
     vga_print("========================================\n"

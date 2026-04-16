@@ -1,5 +1,6 @@
 #include "utils.h"
 #include "io.h"
+#include "printf.h"
 #include <stdint.h>
 
 int cursor_x = 0, cursor_y = 0;
