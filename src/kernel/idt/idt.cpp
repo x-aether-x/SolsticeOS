@@ -6,6 +6,11 @@
 #include "printf.h"
 #include "io.h"
 
+#define MAX_COMMAND_LEN 256
+
+char shell_buffer[MAX_COMMAND_LEN];
+int buffer_index = 0;
+
 char scancodes_ascii[256] = {0};
 
 extern "C" {
@@ -124,9 +129,29 @@ extern "C" void interrupt_handler(struct registers* regs) {
     scancodes_ascii[0x2D] = 'x';
     scancodes_ascii[0x15] = 'y';
     scancodes_ascii[0x2C] = 'z';
+    scancodes_ascii[0x39] = ' ';
+    scancodes_ascii[0x1C] = '\n';
 
     printf("Scancode: %02x\n", scancode);
     printf("ASCII: %c\n", scancodes_ascii[scancode]);
-    vga_putc(scancodes_ascii[scancode], 0, 0); // print at top left of screen
+    if (scancode & 0x80) { // return if no key is being pressed
+        return;
+    }
+    if (scancode == 0x1C) { // if enter is pressed newline
+        vga_print("\n");
+        shell_buffer[buffer_index] = '\0';
+        
+        execute_command(shell_buffer);
+
+        vga_print("$ ");
+        buffer_index = 0;
+        return;
+    }
+    else {
+        if (scancodes_ascii[scancode] > 0 && buffer_index < MAX_COMMAND_LEN - 1) {
+            shell_buffer[buffer_index++] = scancodes_ascii[scancode];
+            vga_putc(scancodes_ascii[scancode]); // Echo to screen
+        }
+    }
 }
 
