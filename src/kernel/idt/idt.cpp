@@ -11,7 +11,40 @@
 char shell_buffer[MAX_COMMAND_LEN];
 int buffer_index = 0;
 
-char scancodes_ascii[256] = {0};
+static const char scancodes_ascii[128] = {
+    0,  27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',   /* Backspace */
+  '\t', /* Tab */
+  'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n',           /* Enter key */
+    0,  /* 29   - Control */
+  'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`',   0,           /* Left shift */
+ '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/',   0,                 /* Right shift */
+  '*',
+    0,  /* Alt */
+  ' ',  /* Space bar */
+    0,  /* Caps lock */
+    0,  /* 59 - F1 key ... > */
+    0,   0,   0,   0,   0,   0,   0,   0,
+    0,  /* < ... F10 */
+    0,  /* 69 - Num lock*/
+    0,  /* Scroll Lock */
+    0,  /* Home key */
+    0,  /* Up Arrow */
+    0,  /* Page Up */
+  '-',
+    0,  /* Left Arrow */
+    0,
+    0,  /* Right Arrow */
+  '+',
+    0,  /* 79 - End key*/
+    0,  /* Down Arrow */
+    0,  /* Page Down */
+    0,  /* Insert Key */
+    0,  /* Delete Key */
+    0,   0,   0,
+    0,  /* F11 Key */
+    0,  /* F12 Key */
+    0, 
+};
 
 extern "C" {
     idt_entry_struct idt_entries[256];
@@ -88,10 +121,15 @@ struct registers {
     uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // pushed by pusha
     uint32_t int_no, err_code;                       // int number and err code
     uint32_t eip, cs, eflags, useresp, ss;           // pushed by cpu
-};
+}__attribute__((packed));
 
 extern "C" void interrupt_handler(struct registers* regs) {
     printf("Received Interrupt: %d\n", regs->int_no);
+    if (regs->int_no < 32) {
+        printf("Exception: %d\n", regs->int_no);
+        kernel_panic();
+    }
+
     if (regs->int_no >= 0x20) {
         // If it's from the pic, send eoi 
         if (regs->int_no >= 0x28) {
@@ -101,56 +139,29 @@ extern "C" void interrupt_handler(struct registers* regs) {
     }
     
     // getting scancodes from keyboard
-    uint8_t scancode = inb(0x60);
+    if (regs->int_no == 0x21) {
+        uint8_t scancode = inb(0x60);
+        printf("Scancode: %02x\n", scancode);
+        printf("ASCII: %c\n", scancodes_ascii[scancode]);
+        if (scancode & 0x80) { // return if no key is being pressed
+            return;
+        }
 
-    scancodes_ascii[0x1E] = 'a';
-    scancodes_ascii[0x30] = 'b';
-    scancodes_ascii[0x2E] = 'c';
-    scancodes_ascii[0x20] = 'd';
-    scancodes_ascii[0x12] = 'e';
-    scancodes_ascii[0x21] = 'f';
-    scancodes_ascii[0x22] = 'g';
-    scancodes_ascii[0x23] = 'h';
-    scancodes_ascii[0x17] = 'i';
-    scancodes_ascii[0x24] = 'j';
-    scancodes_ascii[0x25] = 'k';
-    scancodes_ascii[0x26] = 'l';
-    scancodes_ascii[0x32] = 'm';
-    scancodes_ascii[0x31] = 'n';
-    scancodes_ascii[0x18] = 'o';
-    scancodes_ascii[0x19] = 'p';
-    scancodes_ascii[0x10] = 'q';
-    scancodes_ascii[0x13] = 'r';
-    scancodes_ascii[0x1F] = 's';
-    scancodes_ascii[0x14] = 't';
-    scancodes_ascii[0x16] = 'u';
-    scancodes_ascii[0x2F] = 'v';
-    scancodes_ascii[0x11] = 'w';
-    scancodes_ascii[0x2D] = 'x';
-    scancodes_ascii[0x15] = 'y';
-    scancodes_ascii[0x2C] = 'z';
-    scancodes_ascii[0x39] = ' ';
-    scancodes_ascii[0x1C] = '\n';
+        if (scancode == 0x1C) { // if enter is pressed newline
+            vga_print("\n");
+            shell_buffer[buffer_index] = '\0';
+            
+            execute_command(shell_buffer);
 
-    printf("Scancode: %02x\n", scancode);
-    printf("ASCII: %c\n", scancodes_ascii[scancode]);
-    if (scancode & 0x80) { // return if no key is being pressed
-        return;
-    }
-    if (scancode == 0x1C) { // if enter is pressed newline
-        vga_print("\n");
-        shell_buffer[buffer_index] = '\0';
-        
-        execute_command(shell_buffer);
-
-        vga_print("$ ");
-        buffer_index = 0;
-        return;
-    }
-    else {
-        if (scancodes_ascii[scancode] > 0 && buffer_index < MAX_COMMAND_LEN - 1) {
-            shell_buffer[buffer_index++] = scancodes_ascii[scancode];
-            vga_putc(scancodes_ascii[scancode]); // Echo to screen
+            vga_print("$ ");
+            buffer_index = 0;
+            return;
+        }
+        else {
+            if (scancodes_ascii[scancode] > 0 && buffer_index < MAX_COMMAND_LEN - 1) {
+                shell_buffer[buffer_index++] = scancodes_ascii[scancode];
+                vga_putc(scancodes_ascii[scancode]); // Echo to screen
+            }
         }
     }
 }

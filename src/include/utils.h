@@ -9,3 +9,5 @@ void vga_putc(char c); // set vga_putc to print a string
 void execute_command(const char* command); // execute a command from shell_buffer
 
 void remap_pic(); // remap the PIC interrupt vectors
+
+void kernel_panic();

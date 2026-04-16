@@ -36,9 +36,9 @@ int main() {
     asm volatile ("sti"); // enable interrupt
 
     _putchar('>'); // alternative printf for testing serial port 
-    vga_print("########################################\n"
-              "##            Solstice OS             ##\n"
-              "########################################\n"
+    vga_print("========================================\n"
+              "==            Solstice OS             ==\n"
+              "========================================\n"
               "\n"
               "$ "
               );

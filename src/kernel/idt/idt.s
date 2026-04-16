@@ -4,6 +4,7 @@
 %macro ISR_NOERRCODE 1 ; macro for no error code
     [global isr%1]
     isr%1:
+        cli
         push 0              ; fake error code as it doesnt return one
         push %1             ; interrupt number
         jmp isr_common_stub
@@ -13,6 +14,7 @@
     [global isr%1]
     isr%1:
         ; error code automatically pushed by cpu
+        cli
         push %1             ; interrupt number
         jmp isr_common_stub
 %endmacro
@@ -61,6 +63,7 @@ ISR_NOERRCODE 31
 %endrep
 
 isr_common_stub:
+    cld
     pusha                ; save registers
     
     mov ax, ds           ; save lower 16 bits of data segment

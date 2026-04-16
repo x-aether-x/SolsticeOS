@@ -29,7 +29,7 @@ void vga_print(const char *str) {
         if (*str == '\n') {
             row++; // Move down a row
             col = 0; // Reset column position
-            vidmem = (volatile unsigned short *)0xB8000 + row * 80; // Move to start of next row
+            vidmem = (unsigned short *)0xB8000 + row * 80; // move down a row
         } 
         else {
             if (row >= 25) {
@@ -123,4 +123,9 @@ void remap_pic() {
     // mask interrupts until idt is setup
     outb(PIC1_DATA, 0xFF);
     outb(PIC2_DATA, 0xFF);
+}
+
+void kernel_panic() {
+    vga_print("A critical error has occured, system has been halted.\n");
+    while (1) {} // halt the system
 }
