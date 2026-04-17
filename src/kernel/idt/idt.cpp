@@ -151,19 +151,19 @@ extern "C" void interrupt_handler(struct registers* regs) {
         printf("ASCII: %c\n", scancodes_ascii[scancode]);
 
         if (scancode == 0x1C) { // if enter is pressed newline
-            vga_print("\n");
+            vga_print("\n", 0x00, 0x00);
             shell_buffer[buffer_index] = '\0';
             
             execute_command(shell_buffer);
 
-            vga_print("\n$ ");
+            vga_print("\n$ ", 0x02, 0x00);
             buffer_index = 0;
             return;
         }
         else {
             if (scancodes_ascii[scancode] > 0 && buffer_index < MAX_COMMAND_LEN - 1) {
                 shell_buffer[buffer_index++] = scancodes_ascii[scancode];
-                vga_putc(scancodes_ascii[scancode]); // Echo to screen
+                vga_putc(scancodes_ascii[scancode], 0xFF, 0x00); // Echo to screen
             }
         }
     }
