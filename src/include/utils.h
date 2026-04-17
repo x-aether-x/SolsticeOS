@@ -10,4 +10,4 @@ void execute_command(const char* command); // execute a command from shell_buffe
 
 void remap_pic(); // remap the PIC interrupt vectors
 
-void kernel_panic();
+void kernel_panic(); // kernel_panic function that halts the system when an interrupt occurs

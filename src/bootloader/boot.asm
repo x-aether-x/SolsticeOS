@@ -13,6 +13,8 @@ mov ax, 0x1000
 mov es, ax
 mov bx, 0x0000
 
+; TODO: detect RAM using BIOS: INT 0x15, EAX = 0xE820 to know how many sectors to load
+
 mov al, 32              ; number of sectors (32*512 = 16384 bytes)
 mov ch, 0x00            ; cylinder 0
 mov dh, 0x00

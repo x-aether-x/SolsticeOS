@@ -11,10 +11,12 @@ BUILD_DIR = build
 
 CXXFLAGS = -ffreestanding -m32 -g -Wall -Wextra \
            -fno-exceptions -fno-rtti -fno-use-cxa-atexit \
+		   -fno-pic \
+		   -fno-pie \
            -I$(INC_DIR)
 
 ASFLAGS = -f elf
-LDFLAGS = -ffreestanding -m32 -g -nostdlib -nostartfiles -Ttext 0x10000
+LDFLAGS = -ffreestanding -m32 -g -nostdlib -nostartfiles -Ttext 0x10000 -no-pie
 
 OBJS = $(BUILD_DIR)/kernel_entry.o \
        $(BUILD_DIR)/kernel.o \

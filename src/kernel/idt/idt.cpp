@@ -88,7 +88,7 @@ extern "C" {
     extern void isr33(); // i just wrote all 256 and realised i didnt even need all of them
 }
 
-void* isr_stub_table[] = {
+extern "C" void* isr_stub_table[] = {
     (void*)isr0, (void*)isr1, (void*)isr2, (void*)isr3, (void*)isr4, (void*)isr5, (void*)isr6, (void*)isr7,
     (void*)isr8, (void*)isr9, (void*)isr10, (void*)isr11, (void*)isr12, (void*)isr13, (void*)isr14, (void*)isr15, (void*)isr16, (void*)isr17, (void*)isr18, (void*)isr19, (void*)isr20, (void*)isr21, (void*)isr22, (void*)isr23,
     (void*)isr24, (void*)isr25, (void*)isr26, (void*)isr27, (void*)isr28, (void*)isr29, (void*)isr30, (void*)isr31, (void*)isr32, (void*)isr33
@@ -109,9 +109,11 @@ void initIdt() {
     idt_ptr.limit = (sizeof(idt_entry_struct) * 256) - 1;
     idt_ptr.base = (uint32_t)idt_entries;
 
-    for (int i = 0; i < 34; i++) { // write all 256 isr stubs to the idt
+    for (int i = 0; i < 34; i++) { // write isr stubs to the idt
         setIdtGate(i, (uint32_t)isr_stub_table[i], 0x08, 0x8E);
     }
+    setIdtGate(33, (uint32_t)isr33, 0x08, 0x8E); // load keys manually
+
 
     idt_flush((uint32_t)&idt_ptr);
 }
@@ -141,11 +143,12 @@ extern "C" void interrupt_handler(struct registers* regs) {
     // getting scancodes from keyboard
     if (regs->int_no == 0x21) {
         uint8_t scancode = inb(0x60);
-        printf("Scancode: %02x\n", scancode);
-        printf("ASCII: %c\n", scancodes_ascii[scancode]);
+        
         if (scancode & 0x80) { // return if no key is being pressed
             return;
         }
+        printf("Scancode: %02x\n", scancode);
+        printf("ASCII: %c\n", scancodes_ascii[scancode]);
 
         if (scancode == 0x1C) { // if enter is pressed newline
             vga_print("\n");

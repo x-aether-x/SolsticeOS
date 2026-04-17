@@ -9,35 +9,34 @@
 #define PIC2_COMMAND	PIC2
 #define PIC2_DATA	(PIC2+1)
 
-int row = 0, col = 0;
+static int row = 0, col = 0;
 
 // ---------------- VGA FUNCTIONS ----------------
 
 void vga_putc(char c) {
     unsigned short *vidmem = (unsigned short *)0xB8000;
-    vidmem[row * 80 + col] = (c & 0xFF) | (0x07 << 8);
+
+    if (c == '\n') {
+        col = 0;
+        row++;
+    }
+    else {
+        vidmem[row * 80 + col] = (c & 0xFF) | (0x07 << 8);
+        col++;
+    }
+
+    if (col >= 80) {
+        row++;
+        col = 0;
+    }
     if (row >= 25) {
         row = 0;
     }
-    col++;
 }
 
-void vga_print(const char *str) {
-    volatile unsigned short *vidmem = (unsigned short *)0xB8000; // VGA text buffer
-
-    while (*str) {
-        if (*str == '\n') {
-            row++; // Move down a row
-            col = 0; // Reset column position
-            vidmem = (unsigned short *)0xB8000 + row * 80; // move down a row
-        } 
-        else {
-            if (row >= 25) {
-                row = 0;
-            }
-            vidmem[col++] = (*str & 0xFF) | (0x07 << 8); // White text on black
-        }
-        str++;
+void vga_print(const char *str) { // adapted to use the same printing method for everything
+    for (int i = 0; str[i] != '\0'; i++) {
+        vga_putc(str[i]);
     }
 }
 
@@ -89,7 +88,6 @@ void execute_command(const char* command) {
         }
         row = 0;
         col = 0;
-        vga_print("$ ");
   
     } 
     
@@ -98,7 +96,6 @@ void execute_command(const char* command) {
         vga_print(command);
         vga_print("\n");
         vga_print("Type 'help' for a list of commands.\n");
-        vga_print("$ ");
     }
 }
 
