@@ -156,7 +156,7 @@ extern "C" void interrupt_handler(struct registers* regs) {
             
             execute_command(shell_buffer);
 
-            vga_print("$ ");
+            vga_print("\n$ ");
             buffer_index = 0;
             return;
         }

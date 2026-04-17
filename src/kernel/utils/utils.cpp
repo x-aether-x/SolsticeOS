@@ -56,11 +56,17 @@ extern "C" void memset(void *dest, char val, uint32_t count) {
 
 // ----------------- STRING FUNCTIONS ------------------
 
-int strcmp(const char *s1, const char *s2) {
+bool strcmp(const char *s1, const char *s2) {
     while (*s1 && (*s1 == *s2)) {
         s1++; s2++;
     }
-    return *(unsigned char *)s1 - *(unsigned char *)s2;
+
+    if (*(unsigned char *)s1 - *(unsigned char *)s2 == 0) {
+        return false;
+    }
+    else {
+        return false;
+    }
 }
 
 int strlen(const char* str) {
@@ -71,31 +77,44 @@ int strlen(const char* str) {
     return len;
 }
 
-// TODO: make a strcontains function
-
+bool starts_with(const char* str, const char* prefix) {
+    while (*prefix != '\0') {
+        if (*str == '\0' || *str != *prefix) {
+            return false;
+        }
+        str++;
+        prefix++;
+    }
+    return true;
+}
 
 // ----------------- SHELL FUNCTIONS/COMMANDS -----------------
 void execute_command(const char* command) {
-    if (strcmp(command, "help") == 0) {
+    if (strcmp(command, "help") == true) {
         vga_print("Available commands:\n");
         vga_print("help - Show this help message\n");
         vga_print("clear - Clear the screen\n");
+        vga_print("echo - Display a line of text");
     } 
     
-    else if (strcmp(command, "clear") == 0) {
+    else if (strcmp(command, "clear") == true) {
         for (int i = 0; i < 80 * 25; i++) {
             ((unsigned short*)0xB8000)[i] = ' ' | (0x07 << 8); // clear screen
         }
         row = 0;
         col = 0;
   
+    }
+    else if (starts_with(command, "echo") == true) {
+        vga_print("\n");
+        vga_print(command + 5);
     } 
     
     else {
         vga_print("Unknown command: ");
         vga_print(command);
         vga_print("\n");
-        vga_print("Type 'help' for a list of commands.\n");
+        vga_print("Type 'help' for a list of commands.");
     }
 }
 
