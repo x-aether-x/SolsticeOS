@@ -7,10 +7,14 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
 
 ### Shell commands:
   Help - Prints a help menu with a list of commands
+  
   Echo <TEXT> - Prints a line of text
+  
   Clear - Clears the screen
+  
   Readdisk <SEGMENT> - Reads the disk and returns a formatted hex_dump of the first 128 bytes of a chosen disk segment
-
+  
+>>>>>>> 7b2b85b2a63389decf42220218bdd176e5a7ca04
 
 ### Dependencies
 
@@ -41,6 +45,9 @@ Then use a VNC viewer of choice to view the OS (on port localhost:5901)
 
 Note that if you are going to be running this on a linux distro (NOT WSL), you can run 
 `qemu-system-i386 -drive format=raw,file=build/SolsticeOS.bin -serial stdio` and it will simply open a new window, allowing you to skip the VNC viewer install
+
+### [My Documentation](https://github.com/x-aether-x/SolsticeOS/tree/main/docs)
+
 
 
 If you want to use my project or some part of it in your project, please link it on your project!
