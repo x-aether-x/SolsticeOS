@@ -1,6 +1,6 @@
 # SolsticeOS
 
-A custom bare-bones operating system running on 32-bit protected mode, complete with a custom bootloader, gdt, idt, keyboard interrupts, stack implementation, and a working console with basic shell commands!
+A custom bare-bones operating system running on 32-bit protected mode, complete with a custom bootloader, gdt, idt, keyboard interrupts, stack implementation, and a working console with basic shell commands, and backspace support!
 I am using the printf function here  -> [A simple printf implimentation](https://github.com/mpaland/printf/tree/master).
 
 NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencies are extremely annoying to install without a good package manager (e.g. pacman, apt, yay etc.)
