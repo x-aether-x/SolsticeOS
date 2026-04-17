@@ -7,9 +7,13 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
 
 ### Shell commands:
   Help - Prints a help menu with a list of commands
+  
   Echo <TEXT> - Prints a line of text
+  
   Clear - Clears the screen
+  
   Readdisk <SEGMENT> - Reads the disk and returns a formatted hex_dump of the first 128 bytes of a chosen disk segment
+  
 
 ### Dependencies
 
