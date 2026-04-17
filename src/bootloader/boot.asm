@@ -1,5 +1,5 @@
 [org 0x7c00] ; custom bootloader i made idk if its any good but it works
-KERNEL_LOCATION equ 0x1000
+KERNEL_LOCATION equ 0x10000
 
 mov [BOOT_DISK], dl
 
@@ -9,24 +9,29 @@ mov ds, ax
 mov bp, 0x8000
 mov sp, bp
 
-mov bx, KERNEL_LOCATION
-mov dh, 20 ; if something goes wrong, this number might be too low
+mov ax, 0x1000
+mov es, ax
+mov bx, 0x0000
 
-mov ah, 0x02
-mov al, dh 
-mov ch, 0x00
+; TODO: detect RAM using BIOS: INT 0x15, EAX = 0xE820 to know how many sectors to load
+
+mov al, 32              ; number of sectors (32*512 = 16384 bytes)
+mov ch, 0x00            ; cylinder 0
 mov dh, 0x00
 mov cl, 0x02
 mov dl, [BOOT_DISK]
-int 0x13
+mov ah, 0x02
+int 0x13                ; call bios
+
+jc disk_error           ; check for errors
 
 mov ah, 0x0
 mov al, 0x3
 int 0x10                ; text mode
 
-
-CODE_SEG equ GDT_code - GDT_start
-DATA_SEG equ GDT_data - GDT_start
+mov ah, 0x0
+mov al, 0x3
+int 0x10
 
 cli
 lgdt [GDT_descriptor]
@@ -35,9 +40,8 @@ or eax, 1
 mov cr0, eax
 jmp CODE_SEG:start_protected_mode
 
-jmp $
-
-BOOT_DISK: db 0
+disk_error:
+    jmp $
 
 GDT_start:
     GDT_null:
@@ -66,6 +70,8 @@ GDT_descriptor:
     dw GDT_end - GDT_start - 1
     dd GDT_start
 
+CODE_SEG equ GDT_code - GDT_start
+DATA_SEG equ GDT_data - GDT_start
 
 [bits 32]
 start_protected_mode:
@@ -80,6 +86,8 @@ start_protected_mode:
 	mov esp, ebp
 
     jmp KERNEL_LOCATION
- 
+
+BOOT_DISK: db 0
+
 times 510-($-$$) db 0
 dw 0xaa55

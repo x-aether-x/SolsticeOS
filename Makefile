@@ -11,21 +11,29 @@ BUILD_DIR = build
 
 CXXFLAGS = -ffreestanding -m32 -g -Wall -Wextra \
            -fno-exceptions -fno-rtti -fno-use-cxa-atexit \
+		   -fno-pic \
+		   -fno-pie \
            -I$(INC_DIR)
 
 ASFLAGS = -f elf
-LDFLAGS = -ffreestanding -m32 -g -nostdlib -nostartfiles -Ttext 0x1000
+LDFLAGS = -ffreestanding -m32 -g -nostdlib -nostartfiles -Ttext 0x10000 -no-pie
 
 OBJS = $(BUILD_DIR)/kernel_entry.o \
        $(BUILD_DIR)/kernel.o \
        $(BUILD_DIR)/printf.o \
        $(BUILD_DIR)/gdtc.o \
        $(BUILD_DIR)/gdts.o \
-       $(BUILD_DIR)/utils.o
+       $(BUILD_DIR)/utils.o \
+	   $(BUILD_DIR)/idtc.o \
+	   $(BUILD_DIR)/idts.o
 
 all: $(BUILD_DIR)/SolsticeOS.iso
 
 $(BUILD_DIR)/gdtc.o: $(SRC_DIR)/gdt/gdt.cpp
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/idtc.o: $(SRC_DIR)/idt/idt.cpp
 	@mkdir -p $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
@@ -42,6 +50,9 @@ $(BUILD_DIR)/printf.o: $(SRC_DIR)/misc/printf.cpp
 
 # compile assembly files
 $(BUILD_DIR)/gdts.o: $(SRC_DIR)/gdt/gdt.s
+	$(AS) $(ASFLAGS) $< -o $@
+
+$(BUILD_DIR)/idts.o: $(SRC_DIR)/idt/idt.s
 	$(AS) $(ASFLAGS) $< -o $@
 
 $(BUILD_DIR)/kernel_entry.o: $(SRC_DIR)/kernel_entry.asm
