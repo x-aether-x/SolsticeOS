@@ -25,15 +25,20 @@ static int row = 0, col = 0;
 
 void vga_putc(char c, int txt_col, int bg_col) {
     unsigned char attribute = (bg_col << 4) | (txt_col & 0x0F);
+    unsigned short *vidmem = (unsigned short *)0xB8000;
 
-    unsigned short final_pair = (unsigned short)c | (unsigned short)attribute << 8;
-
+    if (c == '\b') {
+        if (col > 2) {
+            col--;
+            vidmem[row * 80 + col ] = (unsigned short) ' ' | (unsigned short)attribute << 8;
+        }
+        return;
+    }
     if (c == '\n') {
         col = 0;
         row++;
     } else {
-        unsigned short *vidmem = (unsigned short *)0xB8000;
-        vidmem[row * 80 + col] = final_pair;
+        vidmem[row * 80 + col] = (unsigned short)c | (unsigned short)attribute << 8;
         col++;
     }
 

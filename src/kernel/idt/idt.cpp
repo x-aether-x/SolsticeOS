@@ -160,6 +160,13 @@ extern "C" void interrupt_handler(struct registers* regs) {
             buffer_index = 0;
             return;
         }
+        if (scancode == 0x0E) {
+            if (buffer_index > 0) {
+                vga_putc('\b', 0xFF, 0x00);
+                buffer_index--;
+                shell_buffer[buffer_index] = '\0';
+            }
+        }
         else {
             if (scancodes_ascii[scancode] > 0 && buffer_index < MAX_COMMAND_LEN - 1) {
                 shell_buffer[buffer_index++] = scancodes_ascii[scancode];

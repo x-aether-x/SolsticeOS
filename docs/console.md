@@ -7,6 +7,10 @@ I use a function I made called vga_putc() to print characters to that adress, an
 I use keyboard interrupts (IRQ1) to detect whether or not a key is being pressed, and the current command is stored in a variable called buffer_index.
 Whenever the user hits enter, I make it so that the program goes to a newline, and check if the buffer_index is any valid commands, and then if it is, I run the chosen command.
 
+Backspace Implementation:
+    Backspaces were pretty easy, all I had to do was mov col back one, and delete the letter from the command buffer. We don't allow backspaces if col <= 2, because then it would be deleting the "$ ", which we don't want deleted
+
+
 My list of commands is:
     help - Lists commands and displays a help screen
     echo - Prints a line of text
