@@ -13,8 +13,6 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
   Clear - Clears the screen
   
   Readdisk <SEGMENT> - Reads the disk and returns a formatted hex_dump of the first 128 bytes of a chosen disk segment
-  
->>>>>>> 7b2b85b2a63389decf42220218bdd176e5a7ca04
 
 ### Dependencies
 
