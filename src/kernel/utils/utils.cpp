@@ -21,11 +21,109 @@ static int row = 0, col = 0;
 // int current_total_rows = 0; // how many rows are filled?
 // int scroll_offset = 0;      // how many rows up are we from bottom?
 
+// ---------------- MEMORY OPERATIONS ----------------
+
+extern "C" void memset(void *dest, char val, uint32_t count) {
+    char *temp = (char*) dest;
+    for (; count != 0; count --) {
+        *temp++ = val;
+    }
+}
+
+extern "C" void memcpy(void *dest, const void *src, uint32_t count) {
+    char *temp_dest = (char*) dest;
+    const char *temp_src = (const char*) src;
+    for (; count != 0; count --) {
+        *temp_dest++ = *temp_src++;
+    }
+}
+
+extern "C" void memmove(void *dest, const void *src, uint32_t count) {
+    char *temp_dest = (char*) dest;
+    const char *temp_src = (const char*) src;
+
+    if (temp_dest < temp_src) {
+        for (; count != 0; count --) {
+            *temp_dest++ = *temp_src++;
+        }
+    } else {
+        temp_dest += count - 1;
+        temp_src += count - 1;
+        for (; count != 0; count --) {
+            *temp_dest-- = *temp_src--;
+        }
+    }
+}
+
+static inline uint16_t inw(uint16_t port) { // read a word from a port
+    uint16_t ret;
+    asm volatile ("inw %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
+
+void read_disk(uint32_t LBA, uint8_t count, uint32_t target_address) {
+    uint8_t status = inb(0x1F7);
+    if (status == 0xFF) {
+        printf("No drive on port!");
+        return;
+    }
+
+    inb(0x1F7); // clear any possible remaining errors
+    
+    // 0xE0 - master drive lba mode
+    outb(0x1F6, (0xE0 | ((LBA >> 24) & 0x0F)));
+    
+    // sector count and lba
+    outb(0x1F2, count);
+    outb(0x1F3, (uint8_t)LBA);         // lower 8 bits
+    outb(0x1F4, (uint8_t)(LBA >> 8));  // middle 8 bits
+    outb(0x1F5, (uint8_t)(LBA >> 16)); // high 8 bits
+    
+    // 0x20 is the read command
+    outb(0x1F7, 0x20);
+
+    uint16_t* buffer = (uint16_t*)target_address;
+
+    // loop through sectors and get their data
+    for (int s = 0; s < count; s++) {
+        // wait for BSY bit 7 to be 0, and DRQ bit 3 to be 1)
+        while (!(inb(0x1F7) & 0x08)); 
+
+        // send 256 words (512 bytes) per sector
+        for (int i = 0; i < 256; i++) {
+            buffer[i] = inw(0x1F0);
+        }
+        buffer += 256; // move pointer to next sector
+    }
+}
+// gcc and clang make calls to these funcions, so if u dont have them u get cooked
+
 // ---------------- VGA FUNCTIONS ----------------
 
-void vga_putc(char c, int txt_col, int bg_col) {
-    unsigned char attribute = (bg_col << 4) | (txt_col & 0x0F);
+void update_hardware_cursor(int col, int row) {
+    uint16_t pos = row * 80 + col;
+
+    outb(0x3D4, 0x0F);
+    outb(0x3D5, (uint8_t)(pos & 0xFF));
+
+    outb(0x3D4, 0x0E);
+    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
+}
+
+void scroll_screen() {
     unsigned short *vidmem = (unsigned short *)0xB8000;
+    memmove((uint8_t*)vidmem, (uint8_t*)vidmem + (80*2), 24 * 80 * 2);
+    for (int i = 0; i < 80; i++) {
+        vidmem[80*24 + i] = ' ' | (0x07 << 8); // clear last line 
+    }
+    row = 24;
+    col = 0;
+    update_hardware_cursor(col, row);
+}
+
+void vga_putc(char c, int txt_col, int bg_col) {
+    unsigned short *vidmem = (unsigned short *)0xB8000;
+    unsigned char attribute = (bg_col << 4) | (txt_col & 0x0F);
 
     if (c == '\b') {
         if (col > 2) {
@@ -42,14 +140,16 @@ void vga_putc(char c, int txt_col, int bg_col) {
         col++;
     }
 
-    if (row >= 25) {
-        row = 0;
-        col = 0;
-    }
     if (col >= 80) {
         col = 0;
         row++;
     }
+
+    if (row >= 25) {
+        scroll_screen();
+    }
+
+    update_hardware_cursor(col, row);
 }
 
 void vga_print(const char *str, int txt_col, int bg_col) { // adapted to use the same printing method for everything
@@ -103,62 +203,6 @@ void print_hex_8bit(uint8_t n) { // converts numbers to hexadecimal
     vga_print(str, 0xFF, 0x00);
 }
 
-// ---------------- MEMORY OPERATIONS ----------------
-
-extern "C" void memset(void *dest, char val, uint32_t count) {
-    char *temp = (char*) dest;
-    for (; count != 0; count --) {
-        *temp++ = val;
-    }
-}
-
-static inline uint16_t inw(uint16_t port) { // read a word from a port
-    uint16_t ret;
-    asm volatile ("inw %1, %0" : "=a"(ret) : "Nd"(port));
-    return ret;
-}
-
-void read_disk(uint32_t LBA, uint8_t count, uint32_t target_address) {
-    uint8_t status = inb(0x1F7);
-    if (status == 0xFF) {
-        printf("No drive on port!");
-        return;
-    }
-
-    inb(0x1F7); // clear any possible remaining errors
-    
-    // 0xE0 - master drive lba mode
-    outb(0x1F6, (0xE0 | ((LBA >> 24) & 0x0F)));
-    
-    // sector count and lba
-    outb(0x1F2, count);
-    outb(0x1F3, (uint8_t)LBA);         // lower 8 bits
-    outb(0x1F4, (uint8_t)(LBA >> 8));  // middle 8 bits
-    outb(0x1F5, (uint8_t)(LBA >> 16)); // high 8 bits
-    
-    // 0x20 is the read command
-    outb(0x1F7, 0x20);
-
-    uint16_t* buffer = (uint16_t*)target_address;
-
-    // loop through sectors and get their data
-    for (int s = 0; s < count; s++) {
-        // wait for BSY bit 7 to be 0, and DRQ bit 3 to be 1)
-        while (!(inb(0x1F7) & 0x08)); 
-
-        // send 256 words (512 bytes) per sector
-        for (int i = 0; i < 256; i++) {
-            buffer[i] = inw(0x1F0);
-        }
-        buffer += 256; // move pointer to next sector
-    }
-}
-// make a memcpy function
-// make a memcmp function
-// and a memmove function
-// gcc and clang make calls to these funcions, so if u dont have them u get cooked
-
-
 // ----------------- STRING FUNCTIONS ------------------
 
 bool strcmp(const char *s1, const char *s2) {
@@ -210,7 +254,7 @@ void execute_command(const char* command) {
         vga_print("help - Show this help message\n", 0xFF, 0x00);
         vga_print("clear - Clear the screen\n", 0xFF, 0x00);
         vga_print("echo - Display a line of text\n", 0xFF, 0x00);
-        vga_print("readdisk - Reads user specified LBA and returns a hex dump of the first 128 bytes", 0xFF, 0x00);
+        vga_print("readdisk - Reads user specified LBA and returns a hex dump of the chosen sector", 0xFF, 0x00);
     } 
     
     else if (strcmp(command, "clear") == true) {
@@ -236,7 +280,7 @@ void execute_command(const char* command) {
         vga_print(":\n", 0x03, 0x00);
         
         // first 128 bytes
-        hex_dump(file_buffer, 128);
+        hex_dump(file_buffer, 512);
     }
     
     else {
