@@ -6,8 +6,14 @@ SECTIONS
     .text : ALIGN(4K) {
         *(.text._start)
         *(.text)
+        *(.text.*)
     }
-    .data : ALIGN(4K) { *(.data) }
-    .rodata : ALIGN(4K) { *(.rodata) }
-    .bss : ALIGN(4K) { *(.bss) }
+    .data : ALIGN(4K) { *(.data) *(.data.*) }
+    .rodata : ALIGN(4K) { *(.rodata) *(.rodata.*) }
+    .bss : ALIGN(4K) {
+        __bss_start = .;
+        *(.bss) *(.bss.*) *(COMMON)
+        __bss_end = .;
+    }
+    /DISCARD/ : { *(.note*) *(.comment*) *(.eh_frame*) }
 }

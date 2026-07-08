@@ -3,12 +3,12 @@
 #include <stdint.h>
 
 struct idt_entry_struct {
-    uint16_t isr_low;      // lower 16 bits of handler
-    uint16_t selector;      // Kernel segment selector (usually 0x08)
-    uint16_t ist;
-    uint8_t  flags;         // types and attributes
-    uint32_t isr_mid;
-    uint32_t isr_high;     // upper 16 bits of handler
+    uint16_t isr_low;
+    uint16_t selector;
+    uint8_t  ist;
+    uint8_t  flags;
+    uint16_t isr_mid;
+    uint32_t isr_high;
     uint32_t zero;
 } __attribute__((packed));
 

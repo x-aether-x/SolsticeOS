@@ -7,7 +7,7 @@ extern "C" {
     void tss_flush();
 }
 
-gdt_entry_struct gdt_entries[6]; // array to store entries
+gdt_entry_struct gdt_entries[7]; // array to store entries
 gdt_ptr_struct gdt_ptr; // ptr to point to gdt array 
 
 struct tss_entry_struct_64 { // task state segment struct (tss) updated for 64 bit mode
@@ -59,7 +59,7 @@ void writeTSS(uint32_t num, uint16_t ss0, uint64_t esp0) { // set tss function
 }
 
 void initGdt() { // set gdt init function
-    gdt_ptr.limit = (sizeof(gdt_entry_struct) * 6) - 1; // define limit parameter size
+    gdt_ptr.limit = (sizeof(gdt_entry_struct) * 7) - 1;; // define limit parameter size
     gdt_ptr.base  = (uint64_t)&gdt_entries; // store pointer reference address
 
     setGdtGate(0, 0, 0, 0, 0); // null descriptor segment

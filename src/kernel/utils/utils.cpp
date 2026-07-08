@@ -296,7 +296,7 @@ void remap_pic() {
     outb(PIC2_DATA, 0x01);
 
     // mask interrupts until idt is setup
-    outb(PIC1_DATA, 0xFF);
+    outb(PIC1_DATA, 0xFD); // unmask IRQ1 (keyboard) only
     outb(PIC2_DATA, 0xFF);
 }
 

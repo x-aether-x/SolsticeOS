@@ -24,7 +24,7 @@ void console_init(uint8_t* fb, uint32_t width, uint32_t height, uint32_t pitch) 
     ssfn_dst.w = width; ssfn_dst.h = height; ssfn_dst.p = pitch;
     ssfn_dst.fg = 0xFFFFFFFF; ssfn_dst.bg = 0x00000000;
 
-    ssfn_load(NULL, _binary_build_FreeSans_sfn_start);
+    ssfn_src = (ssfn_font_t*)_binary_build_FreeSans_sfn_start; 
     g_font_loaded = 1;
     console_clear();
 }

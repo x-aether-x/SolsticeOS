@@ -14,7 +14,19 @@ typedef void* EFI_HANDLE;
 #define EFI_SUCCESS 0
 #define NULL 0
 
-typedef enum { EfiLoaderData } EFI_MEMORY_TYPE;
+typedef enum {
+    EfiReservedMemoryType,   // 0
+    EfiLoaderCode,           // 1
+    EfiLoaderData,           // 2
+    EfiBootServicesCode,
+    EfiBootServicesData
+} EFI_MEMORY_TYPE;
+
+typedef enum {
+    AllocateAnyPages,
+    AllocateMaxAddress,
+    AllocateAddress
+} EFI_ALLOCATE_TYPE;
 
 struct EFI_GUID {
     UINT32 Data1;
@@ -44,15 +56,61 @@ struct EFI_MEMORY_DESCRIPTOR {
 
 struct EFI_BOOT_SERVICES {
     char Hdr[24];
+
+    void* RaiseTPL;
+    void* RestoreTPL;
+
+    EFI_STATUS (EFIAPI *AllocatePages)(EFI_ALLOCATE_TYPE, EFI_MEMORY_TYPE, UINTN, UINT64*);
+    void* FreePages;
+    EFI_STATUS (EFIAPI *GetMemoryMap)(UINTN*, struct EFI_MEMORY_DESCRIPTOR*, UINTN*, UINTN*, UINT32*);
     EFI_STATUS (EFIAPI *AllocatePool)(EFI_MEMORY_TYPE, UINTN, VOID**);
     void* FreePool;
-    EFI_STATUS (EFIAPI *LocateHandleBuffer)(int, void*, void*, UINTN*, EFI_HANDLE**);
+
+    void* CreateEvent;
+    void* SetTimer;
+    void* WaitForEvent;
+    void* SignalEvent;
+    void* CloseEvent;
+    void* CheckEvent;
+
+    void* InstallProtocolInterface;
+    void* ReinstallProtocolInterface;
+    void* UninstallProtocolInterface;
     EFI_STATUS (EFIAPI *HandleProtocol)(EFI_HANDLE, void*, VOID**);
+    void* Reserved;
+    void* RegisterProtocolNotify;
+    void* LocateHandle;
+    void* LocateDevicePath;
+    void* InstallConfigurationTable;
+
+    void* LoadImage;
+    void* StartImage;
+    void* Exit;
+    void* UnloadImage;
+    EFI_STATUS (EFIAPI *ExitBootServices)(EFI_HANDLE, UINTN);
+
+    void* GetNextMonotonicCount;
     void* Stall;
     void* SetWatchdogTimer;
+
+    void* ConnectController;
+    void* DisconnectController;
+
+    void* OpenProtocol;
+    void* CloseProtocol;
+    void* OpenProtocolInformation;
+
+    void* ProtocolsPerHandle;
+    EFI_STATUS (EFIAPI *LocateHandleBuffer)(int, void*, void*, UINTN*, EFI_HANDLE**);
     EFI_STATUS (EFIAPI *LocateProtocol)(void*, void*, VOID**);
-    EFI_STATUS (EFIAPI *GetMemoryMap)(UINTN*, struct EFI_MEMORY_DESCRIPTOR*, UINTN*, UINTN*, UINT32*);
-    EFI_STATUS (EFIAPI *ExitBootServices)(EFI_HANDLE, UINTN);
+    void* InstallMultipleProtocolInterfaces;
+    void* UninstallMultipleProtocolInterfaces;
+
+    void* CalculateCrc32;
+
+    void* CopyMem;
+    void* SetMem;
+    void* CreateEventEx;
 };
 
 struct EFI_SYSTEM_TABLE {
@@ -63,22 +121,27 @@ struct EFI_SYSTEM_TABLE {
     void* ConIn;
     EFI_HANDLE ConsoleOutHandle;
     struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL* ConOut;
+    EFI_HANDLE StandardErrorHandle;
+    void* StdErr;
+    void* RuntimeServices;
     struct EFI_BOOT_SERVICES* BootServices;
+    UINTN NumberOfTableEntries;
+    void* ConfigurationTable;
 };
 
 struct EFI_GRAPHICS_OUTPUT_PROTOCOL {
     void* QueryMode;
     void* SetMode;
+    void* Blt;
     struct {
-        void* MaxMode;
-        void* Mode;
+        UINT32 MaxMode;
+        UINT32 Mode;
         struct {
-            UINT32 MaxResolutionX;
-            UINT32 MaxResolutionY;
+            UINT32 Version;
             UINT32 HorizontalResolution;
             UINT32 VerticalResolution;
-            int PixelFormat;
-            void* PixelInformation;
+            int    PixelFormat;
+            UINT32 PixelInformation[4];
             UINT32 PixelsPerScanLine;
         } *Info;
         UINTN SizeOfInfo;

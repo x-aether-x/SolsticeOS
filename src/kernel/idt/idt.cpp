@@ -129,7 +129,7 @@ struct registers {
 
 
 extern "C" void interrupt_handler(struct registers* regs) {
-    printf("Received Interrupt: %d\n", (int)regs->int_no);
+    // printf("Received Interrupt: %d\n", (int)regs->int_no);
     if (regs->int_no < 32) {
         printf("Exception: %d\n", (int)regs->int_no);
         kernel_panic();
@@ -148,8 +148,7 @@ extern "C" void interrupt_handler(struct registers* regs) {
         if (scancode & 0x80) { 
             return;
         }
-        printf("Scancode: %02x\n", scancode);
-        printf("ASCII: %c\n", scancodes_ascii[scancode]);
+        printf("%c", scancodes_ascii[scancode]);
 
         if (scancode == 0x1C) { 
             vga_print("\n", 0x00, 0x00);
