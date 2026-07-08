@@ -306,7 +306,6 @@ uint32_t ssfn_utf8(char **s)
 
 #ifndef _STRING_H_
 extern int memcmp (const void *__s1, const void *__s2, size_t __n) __THROW;
-extern void *memset (void *__s, int __c, size_t __n) __THROW;
 #endif
 
 /* Clang does not have built-ins */

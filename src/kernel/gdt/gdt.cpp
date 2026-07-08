@@ -1,66 +1,75 @@
-// gdt sets up the global descriptor table used to define what memory segments you can read and write
-// it also sets up the task state segment used for task info and switching tasks
-
 #include <stdint.h>
 #include "gdt.h"
-#include "utils.h"
+#include "printf.h"
+
 extern "C" {
-    void gdt_flush(uint32_t); // had name mangling issues, so declared these in c
+    void gdt_flush(uint64_t); // had name mangling issues, so declared these in c
     void tss_flush();
 }
 
-struct gdt_entry_struct gdt_entries[6];
-struct gdt_ptr_struct gdt_ptr;
-struct tss_entry_struct tss_entry;
+gdt_entry_struct gdt_entries[6]; // array to store entries
+gdt_ptr_struct gdt_ptr; // ptr to point to gdt array 
 
-void initGdt() {
-  gdt_ptr.limit = (sizeof(struct gdt_entry_struct) * 6) -1;
-  gdt_ptr.base = (uint32_t)&gdt_entries;
+struct tss_entry_struct_64 { // task state segment struct (tss) updated for 64 bit mode
+    uint32_t reserved0;
+    uint64_t rsp0; // stack pointer for loading when going into kernel mode
+    uint64_t rsp1;
+    uint64_t rsp2;
+    uint64_t reserved1;
+    uint64_t ist1;
+    uint64_t ist2;
+    uint64_t ist3;
+    uint64_t ist4;
+    uint64_t ist5;
+    uint64_t ist6;
+    uint64_t ist7;
+    uint64_t reserved2;
+    uint16_t reserved3;
+    uint16_t iomap_base;
+} __attribute__((packed));
 
-  setGdtGate(0,0,0,0,0); // null segment
-  setGdtGate(1,0, 0xFFFFFFFF,0x9A, 0xCF); // kernel code segment
-  setGdtGate(2,0, 0xFFFFFFFF,0x92, 0xCF); // kernel data segment
-  setGdtGate(3,0, 0xFFFFFFFF,0xFA, 0xCF); // user code segment
-  setGdtGate(4,0, 0xFFFFFFFF,0xF2, 0xCF); // user data segment
+struct tss_entry_struct_64 tss_entry; // create instance of tss_entry
 
-  // 0x9A = 1001 1010
-  // this sets out the right values for our kernel code segment's important stuff
-  // and is repeated for all other segments (including the task segment!)
-  // e.g. Present bit = 1 (one bit)
-  //      Descriptor privelige level = 0 (two bits)
-  // etc.
-
-  writeTSS(5, 0x10, 0x0); // task state segment 
-
-  gdt_flush((uint32_t)&gdt_ptr);
-  tss_flush();
+void setGdtGate(uint32_t num, uint64_t base, uint32_t limit, uint8_t access, uint8_t gran) { // set gdt gate function
+    gdt_entries[num].base_low    = (base & 0xFFFF);
+    gdt_entries[num].base_middle = ((base >> 16) & 0xFF);
+    gdt_entries[num].access      = access;
+    gdt_entries[num].flags       = gran;
+    gdt_entries[num].base_high   = ((base >> 24) & 0xFF);
+    gdt_entries[num].limit       = (limit & 0xFFFF);
 }
 
+void writeTSS(uint32_t num, uint16_t ss0, uint64_t esp0) { // set tss function
+    uint64_t base = (uint64_t)&tss_entry;
+    uint32_t limit = sizeof(tss_entry) - 1;
 
-void writeTSS(uint32_t num, uint16_t ss0, uint32_t esp0) {
-  uint32_t base = (uint32_t) &tss_entry;
-  uint32_t limit = base + sizeof(&tss_entry);
+    setGdtGate(num, base, limit, 0x89, 0x00); // write lower 8 bytes of tss entry into gdt slot
 
-  setGdtGate(num, base, limit, 0xe9, 0x00);
-  memset(&tss_entry, 0, sizeof(tss_entry));
+    uint32_t* high_descriptor = (uint32_t*)&gdt_entries[num + 1]; // in 64 bit tss entry takes 16 bytes so write upper 8 bytes into next slot
+    high_descriptor[0] = (base >> 32) & 0xFFFFFFFF;
+    high_descriptor[1] = 0;
 
-  tss_entry.ss0 = ss0;
-  tss_entry.esp0 = esp0;
+    uint8_t* tss_bytes = (uint8_t*)&tss_entry; // clear out the tss memory block
+    for (uint32_t i = 0; i < sizeof(tss_entry); i++) {
+        tss_bytes[i] = 0;
+    }
 
-  tss_entry.cs = 0x08 | 0x3;
-  tss_entry.ss = tss_entry.ds = tss_entry.es = tss_entry.fs = tss_entry.gs = 0x10 | 0x3;
+    tss_entry.rsp0 = esp0; // store kernel mode stack pointer into tss structure 
+    (void)ss0; // ignore unused ss0 register parameter
 }
 
-void setGdtGate(uint32_t num, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran) {
-  // this takes the segment number, whether or not the segment grows up or down (the base), its limit, its access and the granulation
+void initGdt() { // set gdt init function
+    gdt_ptr.limit = (sizeof(gdt_entry_struct) * 6) - 1; // define limit parameter size
+    gdt_ptr.base  = (uint64_t)&gdt_entries; // store pointer reference address
 
-  gdt_entries[num].base_low = (base & 0xFFFF);
-  gdt_entries[num].base_middle = (base >> 16) & 0xFF;
-  gdt_entries[num].base_high = (base >> 24) & 0xFF;
+    setGdtGate(0, 0, 0, 0, 0); // null descriptor segment
+    setGdtGate(1, 0, 0xFFFFF, 0x9A, 0xA0); // kernel code segment descriptor flag set to 64 bit code
+    setGdtGate(2, 0, 0xFFFFF, 0x92, 0xA0); // kernel data segment descriptor
+    setGdtGate(3, 0, 0xFFFFF, 0xFA, 0xA0); // user code segment descriptor 
+    setGdtGate(4, 0, 0xFFFFF, 0xF2, 0xA0); // user data segment descriptor
 
-  gdt_entries[num].limit = (limit & 0xFFFF);
-  gdt_entries[num].flags = (limit >> 16 ) & 0x0F;
-  gdt_entries[num].flags |= (gran & 0xF0);
+    writeTSS(5, 0x10, 0x90000); // write tss info across slots 5 and 6
 
-  gdt_entries[num].access = access;
+    gdt_flush((uint64_t)&gdt_ptr); // flush out the gdt
+    tss_flush(); // load tss register
 }

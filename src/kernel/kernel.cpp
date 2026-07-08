@@ -1,48 +1,52 @@
 #include "printf.h"
+#include "console.h"
 #include "io.h"
 #include "utils.h"
 #include "gdt.h"
 #include "idt.h"
 
-#define SERIAL_PORT 0x3F8 // COM1
+#define SERIAL_PORT 0x3F8
 
+struct FramebufferInfo {
+    uint64_t BaseAddress;
+    uint32_t Width;
+    uint32_t Height;
+    uint32_t Pitch;
+};
+
+// ---------------- SERIAL INITIALIZATION ----------------
 void init_serial() {
-    outb(SERIAL_PORT + 1, 0x00); // Disable interrupts
-    outb(SERIAL_PORT + 3, 0x80); // Enable DLAB to set baud rate
-    outb(SERIAL_PORT + 0, 0x03); // Set divisor to 3 (38400 baud)
     outb(SERIAL_PORT + 1, 0x00);
-    outb(SERIAL_PORT + 3, 0x03); // 8 bits, no parity, one stop bit
-    outb(SERIAL_PORT + 2, 0xC7); // Enable FIFO, clear, set 14-byte threshold
-    outb(SERIAL_PORT + 4, 0x0B); // IRQs enabled, RTS/DSR set
+    outb(SERIAL_PORT + 3, 0x80);
+    outb(SERIAL_PORT + 0, 0x03);
+    outb(SERIAL_PORT + 1, 0x00);
+    outb(SERIAL_PORT + 3, 0x03);
+    outb(SERIAL_PORT + 2, 0xC7);
+    outb(SERIAL_PORT + 4, 0x0B);
 }
 
 void _putchar(char c) {
-    // Wait until the transmit buffer is empty, then write the character.
     while ((inb(SERIAL_PORT + 5) & 0x20) == 0);
     outb(SERIAL_PORT, c);
 }
 
-int main() {
+extern "C" int kernel_entry(FramebufferInfo* fb_info_ptr) {
+    FramebufferInfo* fb_info = (FramebufferInfo*)fb_info_ptr;
+    if (fb_info && fb_info->BaseAddress != 0) {
+        console_init((uint8_t*)fb_info->BaseAddress, fb_info->Width, fb_info->Height, fb_info->Pitch);
+    }
+
     init_serial();
     initGdt();
-    printf("GDT initialised \n");
     initIdt();
-    printf("IDT initialised \n");
+    remap_pic();
 
-    remap_pic(); // remap pic to allow keyboard interrupts
-    printf("PIC remapped, enabling IDT... \n");
-    
-    outb(0x21, 0xFD); // unmask keyboard interrupts 
-    asm volatile ("sti"); // enable interrupt
+    asm volatile ("sti");
 
-    _putchar('>'); // alternative printf for testing serial port 
     vga_print("========================================\n"
               "==            Solstice OS             ==\n"
-              "========================================\n"
-              "\n"
-              "$ ", 0xFF, 0x00
-              );
+              "========================================\n\n$ ", 0xFF, 0x00);
 
-    while (1) {}
+    while (1) { asm volatile ("hlt"); }
     return 1;
 }

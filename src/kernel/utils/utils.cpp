@@ -1,7 +1,9 @@
 #include "utils.h"
 #include "io.h"
 #include "printf.h"
+#include "console.h"
 #include <stdint.h>
+#include <stddef.h>
 
 #define PIC1		0x20		// master adress PIC
 #define PIC2		0xA0		// slave adress PIC
@@ -23,14 +25,14 @@ static int row = 0, col = 0;
 
 // ---------------- MEMORY OPERATIONS ----------------
 
-extern "C" void memset(void *dest, char val, uint32_t count) {
+extern "C" void memset(void *dest, char val, uint64_t count) {
     char *temp = (char*) dest;
     for (; count != 0; count --) {
         *temp++ = val;
     }
 }
 
-extern "C" void memcpy(void *dest, const void *src, uint32_t count) {
+extern "C" void memcpy(void *dest, const void *src, uint64_t count) {
     char *temp_dest = (char*) dest;
     const char *temp_src = (const char*) src;
     for (; count != 0; count --) {
@@ -55,13 +57,22 @@ extern "C" void memmove(void *dest, const void *src, uint32_t count) {
     }
 }
 
+extern "C" int memcmp(const void* s1, const void* s2, size_t n) {
+    const unsigned char *p1 = (const unsigned char*)s1;
+    const unsigned char *p2 = (const unsigned char*)s2;
+    for (size_t i = 0; i < n; i++) {
+        if (p1[i] != p2[i]) return p1[i] - p2[i];
+    }
+    return 0;
+}
+
 static inline uint16_t inw(uint16_t port) { // read a word from a port
     uint16_t ret;
     asm volatile ("inw %1, %0" : "=a"(ret) : "Nd"(port));
     return ret;
 }
 
-void read_disk(uint32_t LBA, uint8_t count, uint32_t target_address) {
+void read_disk(uint32_t LBA, uint8_t count, uintptr_t target_address) {
     uint8_t status = inb(0x1F7);
     if (status == 0xFF) {
         printf("No drive on port!");
@@ -122,40 +133,15 @@ void scroll_screen() {
 }
 
 void vga_putc(char c, int txt_col, int bg_col) {
-    unsigned short *vidmem = (unsigned short *)0xB8000;
-    unsigned char attribute = (bg_col << 4) | (txt_col & 0x0F);
-
-    if (c == '\b') {
-        if (col > 2) {
-            col--;
-            vidmem[row * 80 + col ] = (unsigned short) ' ' | (unsigned short)attribute << 8;
-        }
-        return;
-    }
-    if (c == '\n') {
-        col = 0;
-        row++;
-    } else {
-        vidmem[row * 80 + col] = (unsigned short)c | (unsigned short)attribute << 8;
-        col++;
-    }
-
-    if (col >= 80) {
-        col = 0;
-        row++;
-    }
-
-    if (row >= 25) {
-        scroll_screen();
-    }
-
-    update_hardware_cursor(col, row);
+    (void)txt_col;
+    (void)bg_col;
+    console_putc(c);
 }
 
-void vga_print(const char *str, int txt_col, int bg_col) { // adapted to use the same printing method for everything
-    for (int i = 0; str[i] != '\0'; i++) {
-        vga_putc(str[i], txt_col, bg_col);
-    }
+void vga_print(const char *str, int txt_col, int bg_col) {
+    (void)txt_col;
+    (void)bg_col;
+    console_puts(str);
 }
 
 void hex_dump(void* addr, int len) {
@@ -273,7 +259,7 @@ void execute_command(const char* command) {
         uint32_t lba = string_to_int((char*)arg);
         uint8_t* file_buffer = (uint8_t*)0x20000;
 
-        read_disk(lba, 1, (uint32_t)file_buffer);
+        read_disk(lba, 1, (uintptr_t)file_buffer);
 
         vga_print("\nHex Dump of LBA ", 0x03, 0x00);
         vga_print(arg, 0x03, 0x00);

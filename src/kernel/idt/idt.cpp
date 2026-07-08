@@ -50,7 +50,7 @@ extern "C" {
     idt_entry_struct idt_entries[256];
     idt_ptr_struct idt_ptr;
 
-    void idt_flush(uint32_t);
+    void idt_flush(uint64_t);
 
     extern void isr0(); // okay this isnt even gonnna be that hard
     extern void isr1(); // writing ts 256 times is gonna be easyy
@@ -94,63 +94,64 @@ extern "C" void* isr_stub_table[] = {
     (void*)isr24, (void*)isr25, (void*)isr26, (void*)isr27, (void*)isr28, (void*)isr29, (void*)isr30, (void*)isr31, (void*)isr32, (void*)isr33
 };
 
-extern "C" void setIdtGate(uint8_t vector, uint32_t handler, uint16_t sel, uint8_t flags) {
+extern "C" void setIdtGate(uint8_t vector, uint64_t handler, uint16_t sel, uint8_t flags) {
     idt_entry_struct* descriptor = &idt_entries[vector];
 
-    descriptor->isr_low = (uint32_t)handler & 0xFFFF;
-    descriptor->selector = sel; // kernel code segment 
-    descriptor->flags = flags; 
-    descriptor->isr_high = ((uint32_t)handler >> 16) & 0xFFFF;
-    descriptor->zero = 0;
+    descriptor->isr_low    = (uint64_t)handler & 0xFFFF;
+    descriptor->selector   = sel; 
+    descriptor->ist        = 0;
+    descriptor->flags      = flags; 
+    descriptor->isr_mid    = ((uint64_t)handler >> 16) & 0xFFFF;
+    descriptor->isr_high   = ((uint64_t)handler >> 32) & 0xFFFFFFFF;
+    descriptor->zero   = 0;
 }
  
 
 void initIdt() {
     idt_ptr.limit = (sizeof(idt_entry_struct) * 256) - 1;
-    idt_ptr.base = (uint32_t)idt_entries;
+    idt_ptr.base = (uint64_t)idt_entries;
 
     for (int i = 0; i < 34; i++) { // write isr stubs to the idt
-        setIdtGate(i, (uint32_t)isr_stub_table[i], 0x08, 0x8E);
+        setIdtGate(i, (uint64_t)isr_stub_table[i], 0x08, 0x8E);
     }
-    setIdtGate(33, (uint32_t)isr33, 0x08, 0x8E); // load keys manually
+    setIdtGate(33, (uint64_t)isr33, 0x08, 0x8E); // load keys manually
 
 
-    idt_flush((uint32_t)&idt_ptr);
+    idt_flush((uint64_t)&idt_ptr);
 }
 
 struct registers {
-    uint32_t ds;                                     // pushed manually
-    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // pushed by pusha
-    uint32_t int_no, err_code;                       // int number and err code
-    uint32_t eip, cs, eflags, useresp, ss;           // pushed by cpu
+    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;                                     // pushed manually
+    uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax; // pushed by pusha
+    uint64_t int_no, err_code;                       // int number and err code
+    uint64_t rip, cs, rflags, rsp, ss;           // pushed by cpu
 }__attribute__((packed));
 
+
 extern "C" void interrupt_handler(struct registers* regs) {
-    printf("Received Interrupt: %d\n", regs->int_no);
+    printf("Received Interrupt: %d\n", (int)regs->int_no);
     if (regs->int_no < 32) {
-        printf("Exception: %d\n", regs->int_no);
+        printf("Exception: %d\n", (int)regs->int_no);
         kernel_panic();
     }
 
     if (regs->int_no >= 0x20) {
-        // If it's from the pic, send eoi 
         if (regs->int_no >= 0x28) {
             outb(0xA0, 0x20);
         }
-        outb(0x20, 0x20); // send eoi to master
+        outb(0x20, 0x20); 
     }
     
-    // getting scancodes from keyboard
     if (regs->int_no == 0x21) {
         uint8_t scancode = inb(0x60);
         
-        if (scancode & 0x80) { // return if no key is being pressed
+        if (scancode & 0x80) { 
             return;
         }
         printf("Scancode: %02x\n", scancode);
         printf("ASCII: %c\n", scancodes_ascii[scancode]);
 
-        if (scancode == 0x1C) { // if enter is pressed newline
+        if (scancode == 0x1C) { 
             vga_print("\n", 0x00, 0x00);
             shell_buffer[buffer_index] = '\0';
             
@@ -162,7 +163,7 @@ extern "C" void interrupt_handler(struct registers* regs) {
         }
         if (scancode == 0x0E) {
             if (buffer_index > 0) {
-                vga_putc('\b', 0xFF, 0x00);
+                // vga_putc('\b', 0xFF, 0x00);
                 buffer_index--;
                 shell_buffer[buffer_index] = '\0';
             }
@@ -170,9 +171,8 @@ extern "C" void interrupt_handler(struct registers* regs) {
         else {
             if (scancodes_ascii[scancode] > 0 && buffer_index < MAX_COMMAND_LEN - 1) {
                 shell_buffer[buffer_index++] = scancodes_ascii[scancode];
-                vga_putc(scancodes_ascii[scancode], 0xFF, 0x00); // Echo to screen
+                // vga_putc(scancodes_ascii[scancode], 0xFF, 0x00); 
             }
         }
     }
 }
-

@@ -5,15 +5,17 @@
 struct idt_entry_struct {
     uint16_t isr_low;      // lower 16 bits of handler
     uint16_t selector;      // Kernel segment selector (usually 0x08)
-    uint8_t  zero;          // must always be zero
+    uint16_t ist;
     uint8_t  flags;         // types and attributes
-    uint16_t isr_high;     // upper 16 bits of handler
+    uint32_t isr_mid;
+    uint32_t isr_high;     // upper 16 bits of handler
+    uint32_t zero;
 } __attribute__((packed));
 
 struct idt_ptr_struct { // pointer to the idt
     uint16_t limit;
-    uint32_t base;
+    uint64_t base;
 } __attribute__((packed));
 
 void initIdt();
-extern "C" void setIdtGate(uint8_t n, uint32_t handler, uint16_t sel, uint8_t flags);
+extern "C" void setIdtGate(uint8_t n, uint64_t handler, uint16_t sel, uint8_t flags);

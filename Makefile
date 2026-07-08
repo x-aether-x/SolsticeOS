@@ -1,79 +1,82 @@
-INCLUDES_DIR = src/kernel/include
+CC = g++
+LD = g++
+OBJCOPY = objcopy
+NASM = nasm
+EFI_CC = x86_64-w64-mingw32-g++ # windows-target cross compiler for uefi
 
-CXX = i386-elf-g++
-AS  = nasm
-LD  = i386-elf-g++
-OBJCOPY = i386-elf-objcopy
+CFLAGS = -ffreestanding -m64 -g -Wall -Wextra -fno-exceptions -fno-rtti -fno-use-cxa-atexit -fno-pic -fno-pie -fno-stack-protector -Isrc/include
+LDFLAGS = -ffreestanding -m64 -g -nostdlib -nostartfiles -Ttext 0x100000 -no-pie
 
-SRC_DIR = src/kernel
-INC_DIR = src/include
-BUILD_DIR = build
+# asset source and object paths
+FONT_SRC = src/include/FreeSans.sfn
+FONT_RAW = build/FreeSans.sfn
+FONT_OBJ = build/font.o
 
-CXXFLAGS = -ffreestanding -m32 -g -Wall -Wextra \
-           -fno-exceptions -fno-rtti -fno-use-cxa-atexit \
-		   -fno-pic \
-		   -fno-pie \
-           -I$(INC_DIR)
+# primary compilation targets and modules list
+OBJS = build/kernel_entry.o build/kernel.o build/printf.o build/console.o build/gdtc.o build/gdts.o build/utils.o build/idtc.o build/idts.o $(FONT_OBJ)
 
-ASFLAGS = -f elf
-LDFLAGS = -ffreestanding -m32 -g -nostdlib -nostartfiles -Ttext 0x10000 -no-pie
+all: prepare build/kernel.bin build/BOOTX64.EFI # trigger build chain
 
-OBJS = $(BUILD_DIR)/kernel_entry.o \
-       $(BUILD_DIR)/kernel.o \
-       $(BUILD_DIR)/printf.o \
-       $(BUILD_DIR)/gdtc.o \
-       $(BUILD_DIR)/gdts.o \
-       $(BUILD_DIR)/utils.o \
-	   $(BUILD_DIR)/idtc.o \
-	   $(BUILD_DIR)/idts.o
-
-all: $(BUILD_DIR)/SolsticeOS.iso
-
-$(BUILD_DIR)/gdtc.o: $(SRC_DIR)/gdt/gdt.cpp
-	@mkdir -p $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/idtc.o: $(SRC_DIR)/idt/idt.cpp
-	@mkdir -p $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/utils.o: $(SRC_DIR)/utils/utils.cpp
-	@mkdir -p $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-# kernel ovveride
-$(BUILD_DIR)/kernel.o: $(SRC_DIR)/kernel.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/printf.o: $(SRC_DIR)/misc/printf.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-# compile assembly files
-$(BUILD_DIR)/gdts.o: $(SRC_DIR)/gdt/gdt.s
-	$(AS) $(ASFLAGS) $< -o $@
-
-$(BUILD_DIR)/idts.o: $(SRC_DIR)/idt/idt.s
-	$(AS) $(ASFLAGS) $< -o $@
-
-$(BUILD_DIR)/kernel_entry.o: $(SRC_DIR)/kernel_entry.asm
-	$(AS) $(ASFLAGS) $< -o $@
-
-# link kernel
-$(BUILD_DIR)/complete_kernel.elf: $(OBJS)
-	$(LD) $(LDFLAGS) -o $@ $(OBJS) $(shell $(CXX) -print-libgcc-file-name)
-
-# create iso image
-$(BUILD_DIR)/SolsticeOS.iso: $(BUILD_DIR)/complete_kernel.elf
-	$(OBJCOPY) -O binary $(BUILD_DIR)/complete_kernel.elf $(BUILD_DIR)/kernel.bin
-	$(AS) -f bin src/bootloader/boot.asm -o $(BUILD_DIR)/boot.bin
-	$(AS) -f bin src/other/zeroes.asm -o $(BUILD_DIR)/zeroes.bin
-	# concatenate all to create final binary
-	cat $(BUILD_DIR)/boot.bin $(BUILD_DIR)/kernel.bin $(BUILD_DIR)/zeroes.bin > $(BUILD_DIR)/SolsticeOS.bin
-	# make iso
-	mkisofs -o $@ $(BUILD_DIR)/SolsticeOS.bin
-
-clean:
-	rm -rf $(BUILD_DIR)
+# ensure build directory exists before any compilation happens
+prepare:
 	mkdir -p build
 
-.PHONY: all clean
+build/kernel_entry.o: src/kernel/kernel_entry.asm
+	$(NASM) -f elf64 $< -o $@
+
+build/kernel.o: src/kernel/kernel.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/printf.o: src/kernel/misc/printf.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/console.o: src/kernel/misc/console.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/gdtc.o: src/kernel/gdt/gdt.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/gdts.o: src/kernel/gdt/gdt.s
+	$(NASM) -f elf64 $< -o $@
+
+build/utils.o: src/kernel/utils/utils.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/idtc.o: src/kernel/idt/idt.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/idts.o: src/kernel/idt/idt.s
+	$(NASM) -f elf64 $< -o $@
+
+$(FONT_OBJ): $(FONT_SRC)
+	gzip -dc $< > $(FONT_RAW)
+	$(OBJCOPY) -I binary -O elf64-x86-64 -B i386:x86-64 $(FONT_RAW) $@
+
+build/complete_kernel.elf: $(OBJS)
+	g++ -T src/kernel/linker.ld -ffreestanding -m64 -nostdlib -no-pie -o $@ $^
+
+build/kernel.bin: build/complete_kernel.elf
+	$(OBJCOPY) -O binary $< $@
+
+build/BOOTX64.EFI: src/bootloader/bootloader.cpp
+	$(EFI_CC) -ffreestanding -m64 -fshort-wchar -mno-red-zone \
+	-fno-exceptions -fno-rtti -Wall -Wextra -O2 -nostdlib \
+	-Wl,-subsystem,10 \
+	-e efi_main \
+	-o $@ $<
+
+# finalize deployment folder tree for qemu simulation
+setup_iso: all
+	mkdir -p build/iso/EFI/BOOT
+	cp build/BOOTX64.EFI build/iso/EFI/BOOT/
+	cp build/kernel.bin build/iso/
+
+# simulate system boot sequence
+run: setup_iso
+	qemu-system-x86_64 -bios /usr/share/edk2/x64/OVMF.4m.fd -drive file=fat:rw:build/iso,format=raw,media=disk -serial stdio
+
+debug: setup_iso
+	qemu-system-x86_64 -bios /usr/share/edk2/x64/OVMF.4m.fd -drive file=fat:rw:build/iso,format=raw,media=disk -serial stdio -s -S -debugcon file:debug.log -global isa-debugcon.iobase=0x402
+
+clean: # purge build artifacts
+	rm -rf build

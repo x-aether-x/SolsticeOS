@@ -1,48 +1,46 @@
 [extern interrupt_handler]
 [global idt_flush]
 
-%macro ISR_NOERRCODE 1 ; macro for no error code
+%macro ISR_NOERRCODE 1
     [global isr%1]
     isr%1:
         cli
-        push 0              ; fake error code as it doesnt return one
-        push %1             ; interrupt number
+        push qword 0         ; 64-bit fake error code
+        push qword %1        ; 64-bit interrupt number
         jmp isr_common_stub
 %endmacro
 
-%macro ISR_ERRCODE 1 ; macro for a cpu error code
+%macro ISR_ERRCODE 1
     [global isr%1]
     isr%1:
-        ; error code automatically pushed by cpu
         cli
-        push %1             ; interrupt number
+        push qword %1        ; 64-bit interrupt number
         jmp isr_common_stub
 %endmacro
 
-ISR_NOERRCODE 0 ; Divide Error
-ISR_NOERRCODE 1 ; Debug Exception
-ISR_NOERRCODE 2 ; Nonmaskable External Interrupt
-ISR_NOERRCODE 3 ; Breakpoint
-ISR_NOERRCODE 4 ; Overflow
-ISR_NOERRCODE 5 ; BOUND range exeeded
-ISR_NOERRCODE 6 ; Invalid Opcode (Undefined Opcode) 
-ISR_NOERRCODE 7 ; Device Not Available (No Math Coprocessor)
-ISR_ERRCODE 8 ; Double Fault
-ISR_NOERRCODE 9 ; Coprocessor Segment Overrun (reserved) 
-ISR_ERRCODE 10 ; Invalid TSS
-ISR_ERRCODE 11 ; Segment not present
-ISR_ERRCODE 12 ; Stack-Segment Fault
-ISR_ERRCODE 13 ; General Protection
-ISR_ERRCODE 14 ; Page Fault
-ISR_NOERRCODE 15 ; Reserved for intel. Do not use. 
-ISR_NOERRCODE 16 ; x87 FPU Floating-Point Error (Math Fault) 
-ISR_ERRCODE 17 ; Alignment Check
-ISR_ERRCODE 18 ; Machine Check 
-ISR_NOERRCODE 19 ; SIMD Floating-Point Exception
-ISR_NOERRCODE 20 ; Virtualization Exception
-ISR_ERRCODE 21 ; Control Protection Exception 
+ISR_NOERRCODE 0
+ISR_NOERRCODE 1
+ISR_NOERRCODE 2
+ISR_NOERRCODE 3
+ISR_NOERRCODE 4
+ISR_NOERRCODE 5
+ISR_NOERRCODE 6
+ISR_NOERRCODE 7
+ISR_ERRCODE 8
+ISR_NOERRCODE 9
+ISR_ERRCODE 10
+ISR_ERRCODE 11
+ISR_ERRCODE 12
+ISR_ERRCODE 13
+ISR_ERRCODE 14
+ISR_NOERRCODE 15
+ISR_NOERRCODE 16
+ISR_ERRCODE 17
+ISR_ERRCODE 18
+ISR_NOERRCODE 19
+ISR_NOERRCODE 20
+ISR_ERRCODE 21
 
-; reserved for cpu
 ISR_NOERRCODE 22
 ISR_NOERRCODE 23
 ISR_NOERRCODE 24
@@ -54,8 +52,6 @@ ISR_NOERRCODE 29
 ISR_NOERRCODE 30
 ISR_NOERRCODE 31
 
-; external interrupts
-
 %assign i 32
 %rep 224
     ISR_NOERRCODE i
@@ -64,33 +60,50 @@ ISR_NOERRCODE 31
 
 isr_common_stub:
     cld
-    pusha                ; save registers
     
-    mov ax, ds           ; save lower 16 bits of data segment
-    push eax
+    ; Replace pusha with individual 64-bit register saves
+    push rax
+    push rbx
+    push rcx
+    push rdx
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
 
-    mov ax, 0x10         ; load kernel data segment 
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
+    ; Under the 64-bit System V ABI, the first function argument goes into RDI
+    mov rdi, rsp
+    
+    call interrupt_handler
 
+    ; Restore 64-bit registers individually
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+    pop rbp
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop rbx
+    pop rax
 
-    push esp
-    call interrupt_handler ; go into c++ code 
-    add esp, 4
-
-    pop eax              ; original data segment
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-
-    popa                 ; restore registers
-    add esp, 8           ; cleans up err code an 
-    iret                 ; return
+    add rsp, 16          ; Cleans up the 64-bit error code and interrupt number
+    iretq                ; 64-bit interrupt return instruction
 
 idt_flush:
-    mov eax, [esp + 4]  ; idt structure pointer (from stack)
-    lidt [eax]          ; load idt pointer into cpu
+    ; 64-bit calling convention passes the first parameter in rdi
+    lidt [rdi]
     ret
