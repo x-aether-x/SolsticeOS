@@ -1,23 +1,22 @@
-CC = g++
-LD = g++
-OBJCOPY = objcopy
+CC = g++ -Wno-register
 NASM = nasm
-EFI_CC = x86_64-w64-mingw32-g++ # windows-target cross compiler for uefi
+OBJCOPY = objcopy
+
+EFI_LDS = $(shell pkg-config --variable=libdir gnu-efi)/../lib/elf_x86_64_efi.lds
 
 CFLAGS = -ffreestanding -m64 -g -Wall -Wextra -fno-exceptions -fno-rtti -fno-use-cxa-atexit -fno-pic -fno-pie -fno-stack-protector -Isrc/include
-LDFLAGS = -ffreestanding -m64 -g -nostdlib -nostartfiles -Ttext 0x100000 -no-pie
+EFI_CFLAGS = -I$(EFI_INC) -I$(EFI_INC)/x86_64 -I$(EFI_INC)/protocol -fPIC -fshort-wchar -mno-red-zone -mcmodel=large -fno-stack-protector
 
-# asset source and object paths
+BOOT_CFLAGS = -Isrc/include -fno-stack-protector -fshort-wchar -mno-red-zone -ffreestanding
+
 FONT_SRC = src/include/FreeSans.sfn
 FONT_RAW = build/FreeSans.sfn
 FONT_OBJ = build/font.o
 
-# primary compilation targets and modules list
 OBJS = build/kernel_entry.o build/kernel.o build/printf.o build/console.o build/gdtc.o build/gdts.o build/utils.o build/idtc.o build/idts.o $(FONT_OBJ)
 
-all: prepare build/kernel.bin build/BOOTX64.EFI # trigger build chain
+all: prepare build/kernel.bin build/BOOTX64.EFI
 
-# ensure build directory exists before any compilation happens
 prepare:
 	mkdir -p build
 
@@ -59,24 +58,19 @@ build/kernel.bin: build/complete_kernel.elf
 	$(OBJCOPY) -O binary $< $@
 
 build/BOOTX64.EFI: src/bootloader/bootloader.cpp
-	$(EFI_CC) -ffreestanding -m64 -fshort-wchar -mno-red-zone \
-	-fno-exceptions -fno-rtti -Wall -Wextra -O2 -nostdlib \
-	-Wl,-subsystem,10 \
-	-e efi_main \
-	-o $@ $<
+	g++ -Wno-register -Isrc/include -fno-stack-protector -fshort-wchar -mno-red-zone -fPIC -fno-ident -fno-asynchronous-unwind-tables -ffreestanding -c src/bootloader/bootloader.cpp -o build/bootloader.o
+	ld -m i386pep --subsystem 10 -shared -Bsymbolic -e efi_main -s -o $@ build/bootloader.o
 
-# finalize deployment folder tree for qemu simulation
 setup_iso: all
 	mkdir -p build/iso/EFI/BOOT
 	cp build/BOOTX64.EFI build/iso/EFI/BOOT/
 	cp build/kernel.bin build/iso/
 
-# simulate system boot sequence
 run: setup_iso
 	qemu-system-x86_64 -bios /usr/share/edk2/x64/OVMF.4m.fd -drive file=fat:rw:build/iso,format=raw,media=disk -serial stdio
 
 debug: setup_iso
 	qemu-system-x86_64 -bios /usr/share/edk2/x64/OVMF.4m.fd -drive file=fat:rw:build/iso,format=raw,media=disk -serial stdio -s -S -debugcon file:debug.log -global isa-debugcon.iobase=0x402
 
-clean: # purge build artifacts
+clean:
 	rm -rf build

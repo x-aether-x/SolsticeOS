@@ -28,12 +28,6 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
 
 [dosfstools](https://github.com/dosfstools/dosfstools)
 
-[mingw-w64](https://www.mingw-w64.org/)
-
-[any working vnc - this is mine](https://sourceforge.net/projects/tigervnc/files/latest/download)
-
-
-
 ### Running the Operating System
 
 To run, clone the repo and run:
