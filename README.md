@@ -1,7 +1,9 @@
 # SolsticeOS
 
-A custom bare-bones operating system running on 32-bit protected mode, complete with a custom bootloader, gdt, idt, keyboard interrupts, stack implementation, and a working console with basic shell commands, and backspace support!
-I am using the printf function here  -> [A simple printf implimentation](https://github.com/mpaland/printf/tree/master).
+A custom bare-bones operating system running on 64-bit protected/long mode, complete with a custom UEFI bootloader, gdt, idt, keyboard interrupts, stack implementation, and a working console with basic shell commands, and backspace support!
+I am no longer using the printf function here, as it was no longer working with my recent switch to UEFI [A simple printf implimentation](https://github.com/mpaland/printf/tree/master).
+
+btw i put in alot of effort into this and I'd really appreciate a star as it really does go a long way!
 
 NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencies are extremely annoying to install without a good package manager (e.g. pacman, apt, yay etc.)
 
@@ -41,4 +43,4 @@ Or, to debug with gdb, just run
 
 ### [ai generated documentation btw 🫩✌️](https://github.com/x-aether-x/SolsticeOS/tree/main/docs)
 
-If you want to use my project or some part of it in your project, please link it on your project!
+If you want to use my project or some part of it in your project, please link it on your project! 

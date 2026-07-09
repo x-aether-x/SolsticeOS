@@ -1,7 +1,3 @@
-The kernel is the heart of the code. The kernel is what runs everything, and what calls all of the functions from the other files.
-
-The kernel initialises a function named _putchar(), which sends text through a special pin in the motherboard, and is required for the printf implementation to work.
-
 InitGDT() and InitIDT(), initialises the Interrupt Descriptor Table, and the Global Descriptor Table
 remap_pic() and outb(0x21, 0xFD) allow for the software to take input from the keyboard via interrupts
 

@@ -9,11 +9,6 @@ To make interrupts working, you need three main parts:
     Interrupt Requests, or IRQs (these are the hardware interrupts, e.g. keyboard input, mouse input, etc.)
     Interrupt Service Routines, or ISRs (this is the code that runs to handle interrupts)
 
-As an example of the Interrupts system:
-    Let's say you press a button on the keyboard, for example, the "A" key
-    Because there is a interrupt for that in your IDT, it then checks to see if there is an IRQ associated with it.
-    And then it finds one (IRQ1), and runs a specific block of code that you write (the ISR)
-
 IRQs I've setup
 
 IRQ1 - Keyboard Interrupts 

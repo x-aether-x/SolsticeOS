@@ -239,13 +239,13 @@ void execute_command(const char* command) {
         vga_print("Available commands:\n", 0xFF, 0x00);
         vga_print("help - Show this help message\n", 0xFF, 0x00);
         vga_print("clear - Clear the screen\n", 0xFF, 0x00);
-        vga_print("echo - Display a line of text\n", 0xFF, 0x00);
-        vga_print("readdisk - Reads user specified LBA and returns a hex dump of the chosen sector", 0xFF, 0x00);
-    } 
+        vga_print("echo <TEXT> - Display a line of text\n", 0xFF, 0x00);
+        vga_print("readdisk <SEGMENT> - Reads user specified LBA and returns a hex dump of the chosen sector", 0xFF, 0x00);
+    }
     
     else if (strcmp(command, "clear") == true) {
         for (int i = 0; i < 80 * 25; i++) {
-            ((unsigned short*)0xB8000)[i] = ' ' | (0x07 << 8); // clear screen
+            ((unsigned short*)0xB8000)[i] = ' ' | (0x07 << 8); // clear screen -- NEEDS FIXING
         }
         row = 0;
         col = 0; 

@@ -1,8 +1,10 @@
-Pretend that the computer screen isn't just one flat window, but its made up of 80 by 25 boxes.
-Any of these boxes can be filled with any character, and can be written in any colour.
-These boxes are stored at a certain memory adress (0xB8000), and can be written to by simply writing a character to that adress.
+# How the console works
 
-I use a function I made called vga_putc() to print characters to that adress, and if any of those characters exceed the 80 by 20 grid, then I loop them around.
+Back when I was using BIOS, this was much easier, as I could just pass a value to a hardware address using VGA Text Mode, and the hardware could do the rest printing characters-wise. But now that I have switched to UEFI, I need to take a different approach.
+
+I have to use a custom font, that knows what each character looks like, and print each character pixel by pixel across the screen instead. This process requires a framebuffer, which I have implemented into my bootloader, and a font. My font of choice was SSFN (scalable screen font). The details for the font are located in includes/FreeSans.sfn if you want to check it out!
+
+I use a function I made called vga_putc() to print characters to the screen using the framebuffer, and if any of those characters exceed the 1024 × 768 pixel grid used by QEMU, then I loop them around.
 
 I use keyboard interrupts (IRQ1) to detect whether or not a key is being pressed, and the current command is stored in a variable called buffer_index.
 Whenever the user hits enter, I make it so that the program goes to a newline, and check if the buffer_index is any valid commands, and then if it is, I run the chosen command.
@@ -13,9 +15,9 @@ Backspace Implementation:
 
 My list of commands is:
     help - Lists commands and displays a help screen
-    echo - Prints a line of text
+    echo \<TEXT\>- Prints a line of text
     clear - Clears the screen
-    readdisk - Reads a chosen segment of the disk, and returns a hex dump
+    readdisk \<SEGMENT\>- Reads a chosen segment of the disk, and returns a hex dump
 
 Help was pretty simple, as I could just use the vga_putc() function to print some simple text
 

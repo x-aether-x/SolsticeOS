@@ -1,6 +1,5 @@
 Files can get messy sometimes, especially when concerning operating systems, so they need rules.
-The global descriptor table, often reffered to as the GDT, is a way of setting those rules. 
-It's like a security system that only allows certain parts of the system to access other parts of the system
+The global descriptor table, often reffered to as the GDT, is a way of setting those rules.
 
 It has a:
     Kernel code segment, this is where the kernel can write code
