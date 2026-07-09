@@ -41,6 +41,6 @@ To run, clone the repo and run:
 Or, to debug with gdb, just run 
 `make debug`, which runs the file with -s -S commands
 
-### [ai generated documentation btw 🫩✌️](https://github.com/x-aether-x/SolsticeOS/tree/main/docs)
+### [no more ai generated docs i rewrote it all](https://github.com/x-aether-x/SolsticeOS/tree/main/docs)
 
 If you want to use my project or some part of it in your project, please link it on your project! 
