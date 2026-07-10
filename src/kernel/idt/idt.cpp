@@ -11,6 +11,7 @@
 
 char shell_buffer[MAX_COMMAND_LEN];
 int buffer_index = 0;
+bool shift_pressed = false;
 
 static const char scancodes_ascii[128] = {
     0,  27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',   /* Backspace */
@@ -46,6 +47,16 @@ static const char scancodes_ascii[128] = {
     0,  /* F12 Key */
     0, 
 };
+
+static const char scancodes_ascii_shifted[128] = {
+    0, 27, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b',
+    '\t', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n',
+    0, 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', 0,
+    '|', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0,
+    '*', 0, ' ', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, '-', 0, 0, 0, '+', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
 
 extern "C" {
     idt_entry_struct idt_entries[256];
@@ -136,9 +147,19 @@ extern "C" void interrupt_handler(struct registers* regs) {
 
     if (regs->int_no == 0x21) {
         uint8_t scancode = inb(0x60);
+
+        if (scancode == 0x2A || scancode == 0x36) {
+            shift_pressed = true;
+            return;
+        }
+        if (scancode == (0x2A + 0x80) || scancode == (0x36 + 0x80)) {
+            shift_pressed = false;
+            return;
+        }
+
         if (scancode & 0x80) return;
 
-        char c = scancodes_ascii[scancode];
+        char c = shift_pressed ? scancodes_ascii_shifted[scancode] : scancodes_ascii[scancode];
 
         if (c == '\n') {
             shell_buffer[buffer_index] = '\0';
