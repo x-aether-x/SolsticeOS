@@ -23,6 +23,19 @@ static int row = 0, col = 0;
 // int current_total_rows = 0; // how many rows are filled?
 // int scroll_offset = 0;      // how many rows up are we from bottom?
 
+// ------------------ MISC ----------------------
+bool is_number(const char* str) {
+    if (*str == '\0') return false;
+    while (*str != '\0') {
+        if (*str < '0' || *str > '9') {
+            return false;
+        }
+        str++;
+    }
+    return true;
+}
+
+
 // ---------------- MEMORY OPERATIONS ----------------
 
 extern "C" void memset(void *dest, char val, uint64_t count) {
@@ -148,7 +161,8 @@ void hex_dump(void* addr, int len) {
     unsigned char* p = (unsigned char*)addr;
     for (int i = 0; i < len; i += 16) {
         // print offset (current location in buffer)
-        print_hex_8bit(i); 
+        print_hex_8bit((i >> 8) & 0xFF); // high byte
+        print_hex_8bit(i & 0xFF); // low byte
         vga_print(": ", 0xFF, 0x00);
 
         // print hex values (16 per line)
@@ -244,11 +258,7 @@ void execute_command(const char* command) {
     }
     
     else if (strcmp(command, "clear") == true) {
-        for (int i = 0; i < 80 * 25; i++) {
-            ((unsigned short*)0xB8000)[i] = ' ' | (0x07 << 8); // clear screen -- NEEDS FIXING
-        }
-        row = 0;
-        col = 0; 
+        console_clear();
     }
     else if (starts_with(command, "echo") == true) {
         vga_print("\n", 0xFF, 0x00);
@@ -257,16 +267,21 @@ void execute_command(const char* command) {
     else if (starts_with(command, "readdisk") == true) {
         const char* arg = command + 9;
         uint32_t lba = string_to_int((char*)arg);
-        uint8_t* file_buffer = (uint8_t*)0x20000;
+        if (is_number(arg) == true) {
+            uint8_t* file_buffer = (uint8_t*)0x20000;
 
-        read_disk(lba, 1, (uintptr_t)file_buffer);
+            read_disk(lba, 1, (uintptr_t)file_buffer);
 
-        vga_print("\nHex Dump of LBA ", 0x03, 0x00);
-        vga_print(arg, 0x03, 0x00);
-        vga_print(":\n", 0x03, 0x00);
-        
-        // first 128 bytes
-        hex_dump(file_buffer, 512);
+            vga_print("\nHex Dump of LBA ", 0x03, 0x00);
+            vga_print(arg, 0x03, 0x00);
+            vga_print(":\n", 0x03, 0x00);
+            
+            // full sector (512 bytes)
+            hex_dump(file_buffer, 512);
+        }
+        else {
+            vga_print("Error: Invalid LBA Specified\n", 0xff, 0x00);
+        }
     }
     
     else {

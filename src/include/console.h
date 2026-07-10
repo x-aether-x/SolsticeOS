@@ -12,5 +12,6 @@ struct console_buffer {
 
 void console_init(uint8_t* fb, uint32_t width, uint32_t height, uint32_t pitch);
 void console_clear(void);
+void console_backspace();
 void console_putc(char c);
 void console_puts(const char* s);

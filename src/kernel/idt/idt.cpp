@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "printf.h"
 #include "io.h"
+#include "console.h"
 
 #define MAX_COMMAND_LEN 256
 
@@ -130,48 +131,36 @@ struct registers {
 
 extern "C" void interrupt_handler(struct registers* regs) {
     // printf("Received Interrupt: %d\n", (int)regs->int_no);
-    if (regs->int_no < 32) {
-        printf("Exception: %d\n", (int)regs->int_no);
-        kernel_panic();
-    }
+    if (regs->int_no >= 0x28) outb(0xA0, 0x20);
+    outb(0x20, 0x20); 
 
-    if (regs->int_no >= 0x20) {
-        if (regs->int_no >= 0x28) {
-            outb(0xA0, 0x20);
-        }
-        outb(0x20, 0x20); 
-    }
-    
     if (regs->int_no == 0x21) {
         uint8_t scancode = inb(0x60);
-        
-        if (scancode & 0x80) { 
-            return;
-        }
-        printf("%c", scancodes_ascii[scancode]);
+        if (scancode & 0x80) return;
 
-        if (scancode == 0x1C) { 
-            vga_print("\n", 0x00, 0x00);
+        char c = scancodes_ascii[scancode];
+
+        if (c == '\n') {
             shell_buffer[buffer_index] = '\0';
+            vga_print("\n", 0xFF, 0x00);
             
             execute_command(shell_buffer);
-
+            
             vga_print("\n$ ", 0x02, 0x00);
             buffer_index = 0;
-            return;
-        }
-        if (scancode == 0x0E) {
+            shell_buffer[0] = '\0';
+        } 
+        else if (c == '\b') {
             if (buffer_index > 0) {
-                // vga_putc('\b', 0xFF, 0x00);
+                console_backspace();
                 buffer_index--;
                 shell_buffer[buffer_index] = '\0';
             }
-        }
-        else {
-            if (scancodes_ascii[scancode] > 0 && buffer_index < MAX_COMMAND_LEN - 1) {
-                shell_buffer[buffer_index++] = scancodes_ascii[scancode];
-                // vga_putc(scancodes_ascii[scancode], 0xFF, 0x00); 
-            }
+        } 
+        else if (c != 0 && buffer_index < MAX_COMMAND_LEN - 1) {
+            console_putc(c); 
+            shell_buffer[buffer_index++] = c;
+            shell_buffer[buffer_index] = '\0';
         }
     }
-}
+} 
