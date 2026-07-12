@@ -46,7 +46,7 @@ extern "C" EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *
         
         if(status == EFI_SUCCESS && file_system != nullptr) {
             if(file_system->OpenVolume(file_system, &root) == EFI_SUCCESS) {
-                SystemTable->ConOut->OutputString(SystemTable->ConOut, (CHAR16*)L"volume opened successfully!\n");
+                SystemTable->ConOut->OutputString(SystemTable->ConOut, (CHAR16*)L"Volume opened successfully!\n");
                 break;
             }
         }

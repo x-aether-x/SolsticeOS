@@ -1,4 +1,1 @@
-Update docs without using ai ✅
-Fix clear ✅
-Fix backspaces ✅
-Fix scrolling ✅
+Fully implement and setup ext2 filesystem

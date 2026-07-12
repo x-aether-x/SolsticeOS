@@ -13,7 +13,7 @@ FONT_SRC = src/include/FreeSans.sfn
 FONT_RAW = build/FreeSans.sfn
 FONT_OBJ = build/font.o
 
-OBJS = build/kernel_entry.o build/kernel.o build/printf.o build/console.o build/gdtc.o build/gdts.o build/utils.o build/idtc.o build/idts.o $(FONT_OBJ)
+OBJS = build/kernel_entry.o build/kernel.o build/printf.o build/console.o build/gdtc.o build/gdts.o build/utils.o build/idtc.o build/idts.o build/ext2.o $(FONT_OBJ)
 
 all: prepare build/kernel.bin build/BOOTX64.EFI
 
@@ -27,6 +27,9 @@ build/kernel.o: src/kernel/kernel.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 build/printf.o: src/kernel/misc/printf.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/ext2.o: src/kernel/filesystem/ext2.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 build/console.o: src/kernel/misc/console.cpp
@@ -66,11 +69,33 @@ setup_iso: all
 	cp build/BOOTX64.EFI build/iso/EFI/BOOT/
 	cp build/kernel.bin build/iso/
 
-run: setup_iso
-	qemu-system-x86_64 -bios /usr/share/edk2/x64/OVMF.4m.fd -drive file=fat:rw:build/iso,format=raw,media=disk -serial stdio
+# creates a 64MB Fat32 boot image
+disk.img: build/BOOTX64.EFI build/kernel.bin
+	dd if=/dev/zero of=disk.img bs=1M count=64
+	echo -e "o\nn\np\n1\n\n\nt\nef\na\nw" | fdisk disk.img
+	sudo losetup -P /dev/loop0 disk.img
+	sudo mkfs.vfat -F 32 /dev/loop0p1
+	sudo mkdir -p /mnt/tmp
+	sudo mount /dev/loop0p1 /mnt/tmp
+	sudo mkdir -p /mnt/tmp/EFI/BOOT
+	sudo cp build/BOOTX64.EFI /mnt/tmp/EFI/BOOT/
+	sudo cp build/kernel.bin /mnt/tmp/
+	sudo umount /mnt/tmp
+	sudo losetup -d /dev/loop0
+
+#create a 10MB ext2 test image for filesystem
+ext2.img:
+	dd if=/dev/zero of=ext2.img bs=1M count=10
+	mkfs.ext2 ext2.img
+
+run: disk.img ext2.img
+	qemu-system-x86_64 -bios /usr/share/edk2/x64/OVMF.4m.fd \
+	-drive id=drive0,file=disk.img,format=raw,if=ide \
+	-drive id=drive1,file=ext2.img,format=raw,if=ide \
+	-serial stdio
 
 debug: setup_iso
 	qemu-system-x86_64 -bios /usr/share/edk2/x64/OVMF.4m.fd -drive file=fat:rw:build/iso,format=raw,media=disk -serial stdio -s -S -debugcon file:debug.log -global isa-debugcon.iobase=0x402
 
 clean:
-	rm -rf build
+	rm -rf build disk.img ext2.img

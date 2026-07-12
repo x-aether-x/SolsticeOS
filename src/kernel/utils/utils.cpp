@@ -2,6 +2,7 @@
 #include "io.h"
 #include "printf.h"
 #include "console.h"
+#include "ext2.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -85,39 +86,56 @@ static inline uint16_t inw(uint16_t port) { // read a word from a port
     return ret;
 }
 
-void read_disk(uint32_t LBA, uint8_t count, uintptr_t target_address) {
-    uint8_t status = inb(0x1F7);
-    if (status == 0xFF) {
-        printf("No drive on port!");
-        return;
-    }
-
-    inb(0x1F7); // clear any possible remaining errors
-    
-    // 0xE0 - master drive lba mode
-    outb(0x1F6, (0xE0 | ((LBA >> 24) & 0x0F)));
-    
-    // sector count and lba
-    outb(0x1F2, count);
-    outb(0x1F3, (uint8_t)LBA);         // lower 8 bits
-    outb(0x1F4, (uint8_t)(LBA >> 8));  // middle 8 bits
-    outb(0x1F5, (uint8_t)(LBA >> 16)); // high 8 bits
-    
-    // 0x20 is the read command
-    outb(0x1F7, 0x20);
-
+extern "C" void read_disk(uint32_t LBA, uint8_t count, uint64_t target_address, uint16_t port) { // ive had to rewrite ts function like a thousand times oml </3
     uint16_t* buffer = (uint16_t*)target_address;
 
-    // loop through sectors and get their data
-    for (int s = 0; s < count; s++) {
-        // wait for BSY bit 7 to be 0, and DRQ bit 3 to be 1)
-        while (!(inb(0x1F7) & 0x08)); 
+    outb(port + 6, (0xF0 | ((LBA >> 24) & 0x0F)));
 
-        // send 256 words (512 bytes) per sector
-        for (int i = 0; i < 256; i++) {
-            buffer[i] = inw(0x1F0);
+    for (int i = 0; i < 4; i++) {
+        inb(port + 7);
+    }
+
+    outb(port + 2, count);
+    outb(port + 3, (uint8_t)LBA);
+    outb(port + 4, (uint8_t)(LBA >> 8));
+    outb(port + 5, (uint8_t)(LBA >> 16));
+    outb(port + 7, 0x20);
+
+    for (int s = 0; s < count; s++) {
+        int timeout = 100000;
+        bool has_error = false;
+        
+        while (timeout > 0) {
+            uint8_t status = inb(port + 7);
+    
+            if ((status & 0x01) || (status & 0x20)) {
+                printf("ATA Error on port %x! LBA: %u\n", port, LBA);
+                has_error = true;
+                break;
+            }
+            
+            if (!(status & 0x80) && (status & 0x08)) {
+                break; 
+            }
+            
+            timeout--;
         }
-        buffer += 256; // move pointer to next sector
+
+        if (timeout == 0) {
+            printf("ATA Timeout! Port %x unresponsive.\n", port);
+            return;
+        }
+        if (has_error) {
+            return;
+        }
+
+        for (int i = 0; i < 256; i++) {
+            *buffer++ = inw(port);
+        }
+        
+        for (int i = 0; i < 4; i++) {
+            inb(port + 7);
+        }
     }
 }
 // gcc and clang make calls to these funcions, so if u dont have them u get cooked
@@ -237,14 +255,40 @@ bool starts_with(const char* str, const char* prefix) {
     return true;
 }
 
-uint32_t string_to_int(char* str) {
+uint32_t string_to_int(const char* str) {
     uint32_t ret = 0;
-    for (int i = 0; str[i] != '\0'; ++i) {
-        if (str[i] >= '0' && str[i] <= '9') {
-            ret = ret * 10 + str[i] - '0';
+    int base = 10;
+    
+    if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
+        base = 16;
+        str += 2;
+    }
+
+    while (*str != '\0' && *str != ' ') {
+        if (base == 10 && *str >= '0' && *str <= '9') {
+            ret = ret * 10 + (*str - '0');
+        } 
+        else if (base == 16) {
+            if (*str >= '0' && *str <= '9') {
+                ret = ret * 16 + (*str - '0');
+            } else if (*str >= 'a' && *str <= 'f') {
+                ret = ret * 16 + (*str - 'a' + 10);
+            } else if (*str >= 'A' && *str <= 'F') {
+                ret = ret * 16 + (*str - 'A' + 10);
+            } else {
+                break;
+            }
+        } else {
+            break; 
         }
+        str++;
     }
     return ret;
+}
+
+const char* next_arg(const char* str) {
+    while (*str == ' ') str++;
+    return str;
 }
 
 // ----------------- SHELL FUNCTIONS/COMMANDS -----------------
@@ -254,7 +298,9 @@ void execute_command(const char* command) {
         vga_print("help - Show this help message\n", 0xFF, 0x00);
         vga_print("clear - Clear the screen\n", 0xFF, 0x00);
         vga_print("echo <TEXT> - Display a line of text\n", 0xFF, 0x00);
-        vga_print("readdisk <SEGMENT> - Reads user specified LBA and returns a hex dump of the chosen sector", 0xFF, 0x00);
+        vga_print("readdisk <SEGMENT> - Reads user specified LBA and returns a hex dump of the chosen sector\n", 0xFF, 0x00);
+        vga_print("test_superblock <LBA> - Verifies the data of a user-specified superblock LBA (optional command is port aswell to choose which port to read from)\n", 0xFF, 0x00);
+        vga_print("find_root_inode <PORT> - Finds and prints the inode location of the root directory for the ext2 filesystem", 0xFF, 0x00);
     }
     
     else if (strcmp(command, "clear") == true) {
@@ -270,7 +316,7 @@ void execute_command(const char* command) {
         if (is_number(arg) == true) {
             uint8_t* file_buffer = (uint8_t*)0x20000;
 
-            read_disk(lba, 1, (uintptr_t)file_buffer);
+            read_disk(lba, 1, (uintptr_t)file_buffer, 0x1F0);
 
             vga_print("\nHex Dump of LBA ", 0x03, 0x00);
             vga_print(arg, 0x03, 0x00);
@@ -283,7 +329,24 @@ void execute_command(const char* command) {
             vga_print("Error: Invalid LBA Specified\n", 0xff, 0x00);
         }
     }
-    
+    else if (starts_with(command, "test_superblock")) {
+        const char* p = next_arg(command + 15);
+        uint32_t lba = string_to_int((char*)p);
+
+        while (*p != ' ' && *p != '\0') p++; 
+        p = next_arg(p);
+        
+        const char* port_str = next_arg(p);
+        uint32_t port = string_to_int((char*)port_str); 
+        
+        // default to 0x1f0
+        if (port == 0) port = 0x1F0; 
+        
+        ext2_init(lba, (uint16_t)port);
+    }
+    else if (starts_with(command, "find_root_inode")) {
+        read_root_inode(0x1f0);
+    }
     else {
         vga_print("Unknown command: ", 0xFF, 0x00);
         vga_print(command, 0xFF, 0x00);
