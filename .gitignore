@@ -1,2 +1,4 @@
 build/
 qemu.log
+disk.img
+ext2.img
