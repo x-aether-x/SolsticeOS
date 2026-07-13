@@ -4,6 +4,14 @@
 
 #define EXT2_SUPERBLOCK_OFFSET 1024
 
+extern uint32_t g_current_dir;
+extern uint32_t BG_BLOCK_BITMAP_BLOCK;
+extern uint32_t BG_INODE_BITMAP_BLOCK;
+extern uint32_t BG_INODE_TABLE_BLOCK;
+
+extern uint32_t g_current_dir;
+extern char g_current_path[256];
+
 struct ext2_superblock {
     uint32_t s_inodes_count;      // Inodes count
     uint32_t s_blocks_count;      // Blocks count
@@ -77,24 +85,24 @@ struct ext2_block_group_descriptor {
 } __attribute__((packed));
 
 struct ext2_inode {
-    uint16_t i_mode;        // File mode (directory, file, etc.)
-    uint16_t i_uid;         // Owner Uid
-    uint32_t i_size;        // Size in bytes
+    uint16_t i_mode;        // File type and permissions
+    uint16_t i_uid;         // User ID
+    uint32_t i_size;        // Lower 32 bits of file size
     uint32_t i_atime;       // Access time
     uint32_t i_ctime;       // Creation time
     uint32_t i_mtime;       // Modification time
     uint32_t i_dtime;       // Deletion time
     uint16_t i_gid;         // Group ID
-    uint16_t i_links_count; // Links count
-    uint32_t i_blocks;      // Blocks count
-    uint32_t i_flags;       // File flags
-    uint32_t i_osd1;        // OS dependent 1
-    uint32_t i_block[15];   // Pointers to data blocks (!!!)
+    uint16_t i_links_count; // Hard links count
+    uint32_t i_blocks;      // Number of 512-byte blocks reserved
+    uint32_t i_flags;       // Flags
+    uint32_t i_osd1;        // OS specific
+    uint32_t i_block[15];   // Pointers to data blocks (0-11 are direct)
     uint32_t i_generation;  // File version
     uint32_t i_file_acl;    // File ACL
     uint32_t i_dir_acl;     // Directory ACL
     uint32_t i_faddr;       // Fragment address
-    uint8_t  i_osd2[12];    // OS dependent 2
+    uint32_t i_osd2[3];     // OS specific
 } __attribute__((packed));
 
 struct ext2_directory_entry {
@@ -126,10 +134,18 @@ struct ext2_dir_entry {
 } __attribute__((packed));
 
 bool ext2_init(uint32_t start_lba, uint16_t port);
-void ext2_read_inode(uint32_t inode_num, ext2_inode* out_inode);
-void ext2_read_block(uint32_t block_num, uint8_t* buffer);
-void ext2_list_directory(uint32_t inode_num);
-
-uint32_t get_inode_table(void *disk_handle);
+uint32_t get_inode_table(uint16_t port);
+void ext2_read_block(uint32_t block_num, void* buffer, uint16_t port);
+void list_directory(uint32_t block_num, uint16_t port);
 void read_root_inode(uint16_t port);
-void list_directory(uint32_t block_num, uint16_t port); 
+void ext2_ls_root(uint16_t port);
+void ext2_mkdir();
+void ext2_read_block(uint32_t block, void* buffer, uint16_t port);
+void ext2_write_block(uint32_t block, void* buffer, uint16_t port);
+bool ext2_mkdir(const char* dir_name, uint32_t parent_inode_num, uint16_t port);
+uint32_t ext2_alloc_block(uint16_t port);
+uint32_t ext2_alloc_inode(uint16_t port);
+void ext2_read_inode(uint32_t inode_num, ext2_inode* buffer, uint16_t port); 
+uint32_t ext2_find_in_dir(uint32_t dir_inode_num, const char* name, uint8_t* out_type, uint16_t port);
+bool ext2_cd(const char* name, uint16_t port);
+void ext2_ls(uint16_t port);

@@ -1,31 +1,57 @@
 #include <ext2.h>
 #include <utils.h>
 #include <printf.h>
+#include "io.h"
 
 static ext2_superblock g_sb;
 static uint32_t g_block_size;
 
-bool ext2_init(uint32_t start_lba, uint16_t port) {
-    uint8_t buffer[1024];
-    read_disk(start_lba + 2, 2, (uintptr_t)buffer, port);
+#define EXT2_S_IFDIR 0x4000
+#define EXT2_FT_DIR  2
 
+#define SECTORS_PER_BLOCK 2
+
+#define INODE_SIZE 128
+#define INODES_PER_BLOCK (1024 / INODE_SIZE)
+
+static bool g_ext2_initialized = false;
+
+uint32_t g_current_dir = 2; 
+char g_current_path[256] = "/";
+
+uint32_t BG_BLOCK_BITMAP_BLOCK = 0;
+uint32_t BG_INODE_BITMAP_BLOCK = 0;
+uint32_t BG_INODE_TABLE_BLOCK = 0;
+
+bool ext2_init(uint32_t start_lba, uint16_t port) {
+    if (g_ext2_initialized) return true; // already done
+
+    uint8_t buffer[1024];
+    read_disk(2, 2, (uintptr_t)buffer, port); 
     ext2_superblock* sb = (ext2_superblock*)buffer;
 
-    if (sb->s_magic != EXT2_MAGIC) {
-        printf("Error: Not an ext2 filesystem. Magic: %x\n", sb->s_magic);
-        return false;
-    }
+    io_wait(port);
+ 
+
+    if (sb->s_magic != EXT2_MAGIC) return false;
 
     g_sb = *sb;
     g_block_size = 1024 << g_sb.s_log_block_size;
 
-    printf("Ext2 Initialized. Block size: %d bytes\n", g_block_size);
+    ext2_read_block(2, buffer, port);
+    ext2_bg_descriptor* bgdt = (ext2_bg_descriptor*)buffer;
+
+    BG_BLOCK_BITMAP_BLOCK = bgdt->bg_block_bitmap;
+    BG_INODE_BITMAP_BLOCK = bgdt->bg_inode_bitmap;
+    BG_INODE_TABLE_BLOCK  = bgdt->bg_inode_table;
+
+    g_ext2_initialized = true;
     return true;
 }
 
 void ext2_read_block(uint32_t block_num, void* buffer, uint16_t port) {
     uint32_t sectors_per_block = g_block_size / 512;
-    uint32_t lba = block_num * sectors_per_block;
+    uint32_t lba = (block_num * sectors_per_block) + 0;
     
     read_disk(lba, sectors_per_block, (uintptr_t)buffer, port);
 }
@@ -80,4 +106,388 @@ void read_root_inode(uint16_t port) {
     printf("Root Inode Block 0: %u\n", root_inode->i_block[0]);
 
     list_directory(root_inode->i_block[0], port);
+}
+
+void ext2_ls_root(uint16_t port) {
+    if (!ext2_init(0, port)) {
+        vga_print("Error: Filesystem not initialized!\n", 0xFF, 0x00);
+        return;
+    }
+
+    uint8_t* inode_buffer = (uint8_t*)0x20000; 
+    uint8_t* dir_buffer   = (uint8_t*)0x21000; 
+
+    read_disk(BG_INODE_TABLE_BLOCK * 2, 2, (uintptr_t)inode_buffer, port); // block -> LBA (1K blocks = 2 sectors)
+    ext2_inode* root_inode = (ext2_inode*)(inode_buffer + 128); // inode 2 = index 1, 128-byte inodes
+    uint32_t dir_block = root_inode->i_block[0];
+
+    // switch block id to lba (multiply by two)
+    uint32_t dir_lba = dir_block * 2;
+    read_disk(dir_lba, 2, (uintptr_t)dir_buffer, port);
+
+    uint32_t offset = 0;
+    
+    vga_print("Root Directory Contents:\n", 0x03, 0x00);
+
+    // loop through the block
+    while (offset < 1024) {
+        ext2_dir_entry* entry = (ext2_dir_entry*)(dir_buffer + offset);
+
+        // if inode is 0 its not too bad but still pretty bad
+        // if rec_len is 0 youre frapped
+        if (entry->inode == 0 || entry->rec_len == 0) {
+            break; 
+        }
+
+        for (int i = 0; i < entry->name_len; i++) {
+            int color = (entry->file_type == 2) ? 0x09 : 0x0F; // blue is dirs, white is files
+            
+            char c[2] = { entry->name[i], '\0' };
+            vga_print(c, color, 0x00);
+        }
+        
+        vga_print("   ", 0xFF, 0x00); // spaces between filenames
+        offset += entry->rec_len;
+    }
+    
+    vga_print("\n", 0xFF, 0x00);
+}
+
+static bool name_matches(ext2_dir_entry* e, const char* name) {
+    int len = strlen(name);
+    if (e->name_len != len) return false;
+    for (int i = 0; i < len; i++) {
+        if (e->name[i] != name[i]) return false;
+    }
+    return true;
+}
+
+// returns inode number of 'name' inside directory dir_inode_num, 0 if not found
+uint32_t ext2_find_in_dir(uint32_t dir_inode_num, const char* name, uint8_t* out_type, uint16_t port) {
+    ext2_inode dir_inode;
+    ext2_read_inode(dir_inode_num, &dir_inode, port);
+
+    uint8_t block_buffer[1024];
+    ext2_read_block(dir_inode.i_block[0], block_buffer, port);
+
+    uint32_t offset = 0;
+    while (offset < 1024) {
+        ext2_dir_entry* e = (ext2_dir_entry*)(block_buffer + offset);
+        if (e->inode == 0 || e->rec_len == 0) break;
+        if (name_matches(e, name)) {
+            if (out_type) *out_type = e->file_type;
+            return e->inode;
+        }
+        offset += e->rec_len;
+    }
+    return 0;
+}
+
+bool ext2_cd(const char* name, uint16_t port) {
+    if (!ext2_init(0, port)) {
+        vga_print("Error: Filesystem not initialized!\n", 0xFF, 0x00);
+        return false;
+    }
+    if (strcmp(name, "/") == true) { 
+        g_current_dir = 2; 
+        strcpy(g_current_path, "/");
+        return true; 
+    }
+    if (strcmp(name, ".") == true) {
+        return true;
+    }
+
+    uint32_t search_dir = g_current_dir;
+    const char* search_name = name;
+
+    if (name[0] == '/') {
+        search_dir = 2;
+        search_name = name + 1;
+    }
+    uint8_t type = 0;
+    uint32_t inode = ext2_find_in_dir(search_dir, search_name, &type, port);
+    
+    if (inode == 0) {
+        vga_print("cd: no such file or directory: ", 0xFF, 0x00);
+        vga_print(name, 0xFF, 0x00);
+        vga_print("\n", 0xFF, 0x00);
+        return false;
+    }
+    if (type != EXT2_FT_DIR) {
+        vga_print("cd: not a directory: ", 0xFF, 0x00);
+        vga_print(name, 0xFF, 0x00);
+        vga_print("\n", 0xFF, 0x00);
+        return false;
+    }
+
+    if (strcmp(name, "..") == true) {
+        if (strcmp(g_current_path, "/") == true) {
+            g_current_dir = inode;
+            return true;
+        }
+
+        size_t len = strlen(g_current_path);
+        size_t last_slash_idx = 0;
+        
+        for (size_t i = 0; i < len; i++) {
+            if (g_current_path[i] == '/') {
+                last_slash_idx = i;
+            }
+        }
+
+        if (last_slash_idx == 0) {
+            strcpy(g_current_path, "/");
+        } else {
+            g_current_path[last_slash_idx] = '\0';
+        }
+    } 
+    else {
+        if (name[0] == '/') {
+            strcpy(g_current_path, "/");
+        }
+
+        size_t current_len = strlen(g_current_path);
+        size_t new_len = strlen(search_name);
+        size_t extra_slash = (strcmp(g_current_path, "/") == true) ? 0 : 1;
+        
+        if (current_len + extra_slash + new_len >= 256) {
+            vga_print("cd: path too long\n", 0xFF, 0x00);
+            return false;
+        }
+
+        if (strcmp(g_current_path, "/") == true) {
+            strcat(g_current_path, search_name);
+        } else {
+            strcat(g_current_path, "/");
+            strcat(g_current_path, search_name);
+        }
+    }
+
+    g_current_dir = inode;
+    return true;
+}
+
+
+
+
+// lists the current directory (g_current_dir)
+void ext2_ls(uint16_t port) {
+    if (!ext2_init(0, port)) {
+        vga_print("Error: Filesystem not initialized!\n", 0xFF, 0x00);
+        return;
+    }
+
+    ext2_inode dir_inode;
+    ext2_read_inode(g_current_dir, &dir_inode, port);
+
+    uint8_t block_buffer[1024];
+    ext2_read_block(dir_inode.i_block[0], block_buffer, port);
+
+    uint32_t offset = 0;
+    while (offset < 1024) {
+        ext2_dir_entry* entry = (ext2_dir_entry*)(block_buffer + offset);
+        if (entry->inode == 0 || entry->rec_len == 0) break;
+
+        for (int i = 0; i < entry->name_len; i++) {
+            int color = (entry->file_type == 2) ? 0x09 : 0x0F;
+            char c[2] = { entry->name[i], '\0' };
+            vga_print(c, color, 0x00);
+        }
+        vga_print("   ", 0xFF, 0x00);
+        offset += entry->rec_len;
+    }
+    vga_print("\n", 0xFF, 0x00);
+}
+
+void ext2_write_block(uint32_t block, void* buffer, uint16_t port) {
+    uint32_t lba = block * SECTORS_PER_BLOCK;
+    write_disk(lba, SECTORS_PER_BLOCK, (uintptr_t)buffer, port);
+}
+
+void ext2_write_inode(uint32_t inode_num, ext2_inode* inode_data, uint16_t port) {
+    uint32_t index = inode_num - 1; 
+    uint32_t block_offset = index / INODES_PER_BLOCK;
+    uint32_t byte_offset_in_block = (index % INODES_PER_BLOCK) * INODE_SIZE;
+    uint32_t target_block = BG_INODE_TABLE_BLOCK + block_offset;
+    uint8_t block_buffer[1024];
+
+    ext2_read_block(target_block, block_buffer, port);
+
+    memcpy(block_buffer + byte_offset_in_block, inode_data, sizeof(ext2_inode));
+
+    ext2_write_block(target_block, block_buffer, port);
+}
+
+uint32_t ext2_alloc_block(uint16_t port) {
+    uint8_t bitmap[1024];
+    ext2_read_block(BG_BLOCK_BITMAP_BLOCK, bitmap, port);
+
+    for (int i = 0; i < 1024; i++) {
+        if (bitmap[i] != 0xFF) {
+            for (int bit = 0; bit < 8; bit++) {
+                if (!(bitmap[i] & (1 << bit))) {
+                    
+                    // mark as used
+                    bitmap[i] |= (1 << bit); 
+                    ext2_write_block(BG_BLOCK_BITMAP_BLOCK, bitmap, port);
+                    
+                    return (i * 8) + bit + 1; 
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+uint32_t ext2_alloc_inode(uint16_t port) {
+    uint8_t bitmap[1024];
+    ext2_read_block(BG_INODE_BITMAP_BLOCK, bitmap, port);
+
+    for (int i = 0; i < 1024; i++) {
+        if (bitmap[i] != 0xFF) {
+            for (int bit = 0; bit < 8; bit++) {
+                if (!(bitmap[i] & (1 << bit))) {
+                    
+                    bitmap[i] |= (1 << bit); 
+                    ext2_write_block(BG_INODE_BITMAP_BLOCK, bitmap, port);
+                    
+                    return (i * 8) + bit + 1; 
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+bool ext2_link_dir_entry(uint32_t parent_inode_num, const char* name, uint32_t new_inode, uint8_t type, uint16_t port) {
+    ext2_inode parent_inode; 
+    ext2_read_inode(parent_inode_num, &parent_inode, port);
+
+    uint32_t dir_block = parent_inode.i_block[0];
+    
+
+    uint8_t block_buffer[1024];
+
+    ext2_read_block(dir_block, block_buffer, port);
+    
+    uint32_t offset = 0;
+    int loop_guard = 0;
+    ext2_dir_entry* entry = nullptr;
+
+    while (offset < 1024 && loop_guard < 100) {
+        ext2_dir_entry* entry = (ext2_dir_entry*)(block_buffer + offset);
+
+        if (entry->rec_len == 0) {
+            printf("CRITICAL: Corrupt rec_len at offset %u\n", offset);
+            return false;
+        }
+
+        uint16_t true_size = 8 + entry->name_len;
+        if (true_size % 4 != 0) {
+            true_size += (4 - (true_size % 4));
+        }
+
+        if (entry->rec_len > true_size && (offset + entry->rec_len == 1024)) {
+
+            uint16_t old_rec_len = entry->rec_len;
+            entry->rec_len = true_size;
+            
+            offset += true_size;
+            
+            ext2_dir_entry* new_entry = (ext2_dir_entry*)(block_buffer + offset);
+            new_entry->inode = new_inode;
+            new_entry->file_type = type;
+            new_entry->name_len = strlen(name);
+            
+            new_entry->rec_len = old_rec_len - true_size; 
+            memcpy(new_entry->name, name, new_entry->name_len);
+
+            ext2_write_block(dir_block, block_buffer, port);
+            return true;
+        }
+
+        offset += entry->rec_len;
+        loop_guard++;
+    }
+
+    vga_print("Error: Parent directory block is full.\n", 0xFF, 0x00);
+    return false;
+}
+
+void ext2_read_inode(uint32_t inode_num, ext2_inode* buffer, uint16_t port) {
+    uint32_t index = inode_num - 1;
+    uint32_t block_offset = index / INODES_PER_BLOCK;
+    uint32_t byte_offset_in_block = (index % INODES_PER_BLOCK) * INODE_SIZE;
+    uint32_t target_block = BG_INODE_TABLE_BLOCK + block_offset;
+    
+
+    uint8_t block_buffer[1024];
+    ext2_read_block(target_block, block_buffer, port);
+    memcpy(buffer, block_buffer + byte_offset_in_block, sizeof(ext2_inode));
+
+}
+
+bool ext2_mkdir(const char* dir_name, uint32_t parent_inode_num, uint16_t port) {
+    if (!ext2_init(0, port)) {
+        vga_print("Error: Filesystem not initialized!\n", 0xFF, 0x00);
+        return false;
+    }
+
+    uint32_t new_inode_num = ext2_alloc_inode(port);
+    if (new_inode_num == 0) {
+        vga_print("mkdir error: No free inodes.\n", 0xFF, 0x00);
+        return false;
+    }
+
+    uint32_t new_block_num = ext2_alloc_block(port);
+    if (new_block_num == 0) {
+        vga_print("mkdir error: No free blocks.\n", 0xFF, 0x00);
+        // todo: free the previously allocated inode to prevent leak but we can do that later
+        return false;
+    }
+
+    ext2_inode new_inode;
+    memset(&new_inode, 0, sizeof(ext2_inode));
+    
+    new_inode.i_mode = EXT2_S_IFDIR | 0x01ED; // Directory + rwxr-xr-x permissions
+    new_inode.i_size = 1024; // 1 block
+    new_inode.i_blocks = 2;  // 2 standard 512-byte disk sectors = 1 block
+    new_inode.i_links_count = 2; // Links for '.' and from the parent directory
+    new_inode.i_block[0] = new_block_num; 
+
+    ext2_write_inode(new_inode_num, &new_inode, port);
+
+    uint8_t block_buffer[1024];
+    memset(block_buffer, 0, 1024);
+
+    uint32_t offset = 0;
+
+    // current dir
+    ext2_dir_entry* dot_entry = (ext2_dir_entry*)(block_buffer + offset);
+    dot_entry->inode = new_inode_num;
+    dot_entry->name_len = 1;
+    dot_entry->file_type = EXT2_FT_DIR;
+    dot_entry->name[0] = '.';
+    dot_entry->rec_len = 12; 
+    offset += dot_entry->rec_len;
+
+    // previous dir
+    ext2_dir_entry* dotdot_entry = (ext2_dir_entry*)(block_buffer + offset);
+    dotdot_entry->inode = parent_inode_num;
+    dotdot_entry->name_len = 2;
+    dotdot_entry->file_type = EXT2_FT_DIR;
+    dotdot_entry->name[0] = '.';
+    dotdot_entry->name[1] = '.';
+    dotdot_entry->rec_len = 1024 - offset; 
+
+    ext2_write_block(new_block_num, block_buffer, port);
+
+    bool linked = ext2_link_dir_entry(parent_inode_num, dir_name, new_inode_num, EXT2_FT_DIR, port);
+    if (!linked) {
+        vga_print("mkdir error: Failed to link to parent.\n", 0xFF, 0x00);
+        return false;
+    }
+
+    vga_print("Directory created successfully!\n", 0x0A, 0x00);
+    return true;
 }

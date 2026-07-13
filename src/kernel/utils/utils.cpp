@@ -15,6 +15,8 @@
 
 static int row = 0, col = 0;
 
+#define ROOT_INODE 2
+
 // #define MAX_ROWS 2000 // max history rows
 // #define SCREEN_ROWS 25
 // #define SCREEN_COLS 80
@@ -120,7 +122,6 @@ extern "C" void read_disk(uint32_t LBA, uint8_t count, uint64_t target_address, 
             
             timeout--;
         }
-
         if (timeout == 0) {
             printf("ATA Timeout! Port %x unresponsive.\n", port);
             return;
@@ -128,16 +129,68 @@ extern "C" void read_disk(uint32_t LBA, uint8_t count, uint64_t target_address, 
         if (has_error) {
             return;
         }
-
         for (int i = 0; i < 256; i++) {
             *buffer++ = inw(port);
-        }
-        
+        } 
         for (int i = 0; i < 4; i++) {
             inb(port + 7);
         }
     }
 }
+
+extern "C" void write_disk(uint32_t LBA, uint8_t count, uint64_t source_address, uint16_t port) {
+    uint16_t* buffer = (uint16_t*)source_address;
+
+    outb(port + 6, (0xF0 | ((LBA >> 24) & 0x0F)));
+
+    // delay
+    for (int i = 0; i < 4; i++) {
+        inb(port + 7);
+    }
+
+    outb(port + 2, count);
+    outb(port + 3, (uint8_t)LBA);
+    outb(port + 4, (uint8_t)(LBA >> 8));
+    outb(port + 5, (uint8_t)(LBA >> 16));
+    
+    // ATA write
+    outb(port + 7, 0x30); 
+
+    for (int s = 0; s < count; s++) {
+        int timeout = 100000;
+        bool has_error = false;
+        
+        // wait for drive to be ready
+        while (timeout > 0) {
+            uint8_t status = inb(port + 7);
+    
+            if ((status & 0x01) || (status & 0x20)) {
+                printf("ATA Write Error on port %x! LBA: %u\n", port, LBA);
+                has_error = true;
+                break;
+            }
+            
+            if (!(status & 0x80) && (status & 0x08)) {
+                break; 
+            }
+            
+            timeout--;
+        }
+        if (timeout == 0 || has_error) {
+            printf("ATA Write failed or timed out!\n");
+            return;
+        }
+        for (int i = 0; i < 256; i++) {
+            outw(port, *buffer++);
+        }
+        for (int i = 0; i < 4; i++) inb(port + 7); // delay (again)
+    }
+
+    // flush cache ONCE after ALL sectors, then wait for BSY to clear
+    outb(port + 7, 0xE7);
+    while (inb(port + 7) & 0x80);
+}
+
 // gcc and clang make calls to these funcions, so if u dont have them u get cooked
 
 // ---------------- VGA FUNCTIONS ----------------
@@ -236,6 +289,37 @@ bool strcmp(const char *s1, const char *s2) {
     }
 }
 
+char* strcpy(char* dest, const char* src) {
+    if (dest == nullptr || src == nullptr) {
+        return dest;
+    }
+
+    char* ptr = dest;
+    while (*src != '\0') {
+        *ptr++ = *src++;
+    }
+    *ptr = '\0';
+    return dest;
+}
+
+char* strcat(char* dest, const char* src) {
+    if (dest == nullptr || src == nullptr) {
+        return dest;
+    }
+
+    char* ptr = dest;
+    while (*ptr != '\0') {
+        ptr++;
+    }
+
+    while (*src != '\0') {
+        *ptr++ = *src++;
+    }
+    *ptr = '\0';
+    return dest;
+}
+
+
 int strlen(const char* str) {
     int len = 0;
     while (str[len] != '\0') {
@@ -299,8 +383,9 @@ void execute_command(const char* command) {
         vga_print("clear - Clear the screen\n", 0xFF, 0x00);
         vga_print("echo <TEXT> - Display a line of text\n", 0xFF, 0x00);
         vga_print("readdisk <SEGMENT> - Reads user specified LBA and returns a hex dump of the chosen sector\n", 0xFF, 0x00);
-        vga_print("test_superblock <LBA> - Verifies the data of a user-specified superblock LBA (optional command is port aswell to choose which port to read from)\n", 0xFF, 0x00);
-        vga_print("find_root_inode <PORT> - Finds and prints the inode location of the root directory for the ext2 filesystem", 0xFF, 0x00);
+        vga_print("ls - Lists the contents of the current directory\n", 0xFF, 0x00);
+        vga_print("cd <DIR> - Change directory (cd .. to go up, cd / or bare cd for root)\n", 0xFF, 0x00);
+        vga_print("mkdir <DIR_NAME> - Creates a new directory at the current path location", 0xFF, 0x00);
     }
     
     else if (strcmp(command, "clear") == true) {
@@ -329,24 +414,29 @@ void execute_command(const char* command) {
             vga_print("Error: Invalid LBA Specified\n", 0xff, 0x00);
         }
     }
-    else if (starts_with(command, "test_superblock")) {
-        const char* p = next_arg(command + 15);
-        uint32_t lba = string_to_int((char*)p);
+    else if (strcmp(command, "ls") == true) {
+        ext2_ls(0x1F0);
+    }
+    else if (starts_with(command, "cd") == true && (command[2] == ' ' || command[2] == '\0')) {
+        const char* dir_name = next_arg(command + 2);
+        if (strlen(dir_name) == 0) {
+            ext2_cd("/", 0x1F0); // bare cd goes to root
+        } else {
+            ext2_cd(dir_name, 0x1F0);
+        }
+    }
+    else if (starts_with(command, "mkdir") == true) {
+        const char* dir_name = next_arg(command + 5);
+        if (strlen(dir_name) == 0) {
+            vga_print("mkdir: missing operand\n", 0xFF, 0x00);
+        } else {
+            vga_print("Creating directory: ", 0xFF, 0x00);
+            vga_print(dir_name, 0xFF, 0x00);
+            vga_print("\n", 0xFF, 0x00);
 
-        while (*p != ' ' && *p != '\0') p++; 
-        p = next_arg(p);
-        
-        const char* port_str = next_arg(p);
-        uint32_t port = string_to_int((char*)port_str); 
-        
-        // default to 0x1f0
-        if (port == 0) port = 0x1F0; 
-        
-        ext2_init(lba, (uint16_t)port);
-    }
-    else if (starts_with(command, "find_root_inode")) {
-        read_root_inode(0x1f0);
-    }
+            ext2_mkdir(dir_name, g_current_dir, 0x1F0);
+        }
+    } 
     else {
         vga_print("Unknown command: ", 0xFF, 0x00);
         vga_print(command, 0xFF, 0x00);

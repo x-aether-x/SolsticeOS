@@ -6,6 +6,7 @@
 #include "printf.h"
 #include "io.h"
 #include "console.h"
+#include "ext2.h"
 
 #define MAX_COMMAND_LEN 256
 
@@ -167,7 +168,7 @@ extern "C" void interrupt_handler(struct registers* regs) {
             
             execute_command(shell_buffer);
             
-            vga_print("\n$ ", 0x02, 0x00);
+            printf("\n%s $ ", g_current_path);
             buffer_index = 0;
             shell_buffer[0] = '\0';
         } 

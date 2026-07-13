@@ -1,5 +1,4 @@
 #include "printf.h"
-#include "kio.h"
 #include "utils.h"
 #include "console.h"
 #include <stdint.h>

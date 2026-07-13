@@ -86,7 +86,7 @@ disk.img: build/BOOTX64.EFI build/kernel.bin
 #create a 10MB ext2 test image for filesystem
 ext2.img:
 	dd if=/dev/zero of=ext2.img bs=1M count=10
-	mkfs.ext2 ext2.img
+	mkfs.ext2 -b 1024 -I 128 ext2.img
 
 run: disk.img ext2.img
 	qemu-system-x86_64 -bios /usr/share/edk2/x64/OVMF.4m.fd \
