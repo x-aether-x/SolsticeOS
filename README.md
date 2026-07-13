@@ -8,13 +8,19 @@ btw i put in alot of effort into this and I'd really appreciate a star as it rea
 NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencies are extremely annoying to install without a good package manager (e.g. pacman, apt, yay etc.)
 
 ### Shell commands:
-  Help - Prints a help menu with a list of commands
+  help - Prints a help menu with a list of commands
   
-  Echo \<TEXT\> - Prints a line of text
+  echo \<TEXT\> - Prints a line of text
   
-  Clear - Clears the screen
+  clear - Clears the screen
   
-  Readdisk \<SEGMENT\> - Reads the disk and returns a formatted hex_dump of the first 128 bytes of a chosen disk segment
+  readdisk \<SEGMENT\> - Reads the disk and returns a formatted hex_dump of the first 128 bytes of a chosen disk segment
+  
+  cd \<DIR\> - Changes directory (cd .. to go up, cd / or bare cd for root)
+
+  ls - Lists the contents of the current working directory
+
+  mkdir \<DIR_NAME\> - Creates a new directory at the current path location
 
 ### Dependencies
 
@@ -29,6 +35,8 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
 [ovmf](https://github.com/tianocore/tianocore.github.io/wiki/OVMF)
 
 [dosfstools](https://github.com/dosfstools/dosfstools)
+
+[xorriso](https://scdbackup.sourceforge.net/xorriso_eng.html)
 
 ### Running the Operating System
 

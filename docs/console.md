@@ -12,13 +12,6 @@ Whenever the user hits enter, I make it so that the program goes to a newline, a
 Backspace Implementation:
     Backspaces were pretty easy, all I had to do was mov col back one, and delete the letter from the command buffer. We don't allow backspaces if col <= 2, because then it would be deleting the "$ ", which we don't want deleted
 
-
-My list of commands is:
-    help - Lists commands and displays a help screen
-    echo \<TEXT\>- Prints a line of text
-    clear - Clears the screen
-    readdisk \<SEGMENT\>- Reads a chosen segment of the disk, and returns a hex dump
-
 Help was pretty simple, as I could just use the vga_putc() function to print some simple text
 
 Echo was a little bit different, as instead of comparing the buffer_index to the command letter for letter(using my strcmp function), I had to check if the buffer_index starts with echo, and so I created a new function, starts_with.

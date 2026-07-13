@@ -83,6 +83,12 @@ disk.img: build/BOOTX64.EFI build/kernel.bin
 	sudo umount /mnt/tmp
 	sudo losetup -d /dev/loop0
 
+build_iso: all
+	mkdir -p build/iso/EFI/BOOT
+	cp build/BOOTX64.EFI build/iso/EFI/BOOT/
+	cp build/kernel.bin build/iso/
+	xorriso -as mkisofs -R -f -e EFI/BOOT/BOOTX64.EFI -no-emul-boot -o build/SolsticeOS.iso build/iso
+
 #create a 10MB ext2 test image for filesystem
 ext2.img:
 	dd if=/dev/zero of=ext2.img bs=1M count=10
