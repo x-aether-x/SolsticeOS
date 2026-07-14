@@ -384,10 +384,10 @@ void execute_command(const char* command) {
         vga_print("clear - Clear the screen\n", 0xFF, 0x00);
         vga_print("echo <TEXT> - Display a line of text\n", 0xFF, 0x00);
         vga_print("readdisk <SEGMENT> - Reads user specified LBA and returns a hex dump of the chosen sector\n", 0xFF, 0x00);
-        vga_print("ls - Lists the contents of the current directory\n", 0xFF, 0x00);
+        vga_print("ls <DIR>- Lists the contents of the current directory by default, but can also list contents of other directories if they are provided\n", 0xFF, 0x00);
         vga_print("cd <DIR> - Change directory (cd .. to go up, cd / or bare cd for root)\n", 0xFF, 0x00);
-        vga_print("mkdir <DIR_NAME> - Creates a new directory at the current path location", 0xFF, 0x00);
-        vga_print("sleep <SECONDS> - causes the thread to sleep for a number of seconds have elapsed\n", 0xFF, 0x00);
+        vga_print("mkdir <DIR_NAME> - Creates a new directory at the user's chosen location", 0xFF, 0x00);
+        vga_print("sleep <SECONDS> - Pauses the kernel for a user specified number of seconds\n", 0xFF, 0x00);
     }
     
     else if (strcmp(command, "clear") == true) {
@@ -417,7 +417,15 @@ void execute_command(const char* command) {
         }
     }
     else if (strcmp(command, "ls") == true) {
-        ext2_ls(0x1F0);
+        ext2_ls(g_current_path, 0x1f0);
+    }
+    else if (starts_with(command, "ls") == true) {
+        const char* dir_name = next_arg(command + 2);
+        if (strlen(dir_name) == 0) {
+            ext2_ls("/", 0x1F0); // bare cd goes to root
+        } else {
+            ext2_ls(dir_name, 0x1F0);
+        }
     }
     else if (starts_with(command, "cd") == true && (command[2] == ' ' || command[2] == '\0')) {
         const char* dir_name = next_arg(command + 2);
@@ -436,7 +444,7 @@ void execute_command(const char* command) {
             vga_print(dir_name, 0xFF, 0x00);
             vga_print("\n", 0xFF, 0x00);
 
-            ext2_mkdir(dir_name, g_current_dir, 0x1F0);
+            ext2_mkdir(dir_name, 0x1F0);
         }
     }
     else if (starts_with(command, "sleep") == true) {

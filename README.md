@@ -18,9 +18,9 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
   
   cd \<DIR\> - Changes directory (cd .. to go up, cd / or bare cd for root)
 
-  ls - Lists the contents of the current working directory
+  ls \<DIR\> - Lists the contents of the current working directory by default, but can also view contents of other directories with an optional flag
 
-  mkdir \<DIR_NAME\> - Creates a new directory at the current path location
+  mkdir \<DIR_NAME\> - Creates a new directory at a user provided location
   
   sleep \<SECONDS\> - Pauses the kernel for a user specified number of seconds
 

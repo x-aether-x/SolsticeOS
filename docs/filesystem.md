@@ -18,8 +18,8 @@ We then fill it with data regarding where various important data structures.
 
 We then use the BGDT to find out where the root inode is located in memory, and then from there the fun part begins.
 
-Now that we have initialised the Superblock and BGDT, and found the root inode, we can use this information to list the contents of the root directory using the ls command.
+Then I created a function called ext2_traverse_path(), which traverses paths and returns the user's intened root inode, which allows for interacting with directories that arent the working directory
+
+Now that we have initialised the Superblock and BGDT, and found the root inode, we can use this information to list the contents of the current directory using the ls command.
 Next, I implemented the mkdir command, which was a little bit more complex to implement, as I had to make a couple new helper functions for it
 Finally, I added the cd command, which was surprisingly, the simplest command to implement.
-
-I am still yet to setup interacting with directories that aren't in the current directory (e.g. mkdir test/test1 will create a directory named "test/test1" at the current working location)
