@@ -386,7 +386,7 @@ void execute_command(const char* command) {
         vga_print("readdisk <SEGMENT> - Reads user specified LBA and returns a hex dump of the chosen sector\n", 0xFF, 0x00);
         vga_print("ls <DIR>- Lists the contents of the current directory by default, but can also list contents of other directories if they are provided\n", 0xFF, 0x00);
         vga_print("cd <DIR> - Change directory (cd .. to go up, cd / or bare cd for root)\n", 0xFF, 0x00);
-        vga_print("mkdir <DIR_NAME> - Creates a new directory at the user's chosen location", 0xFF, 0x00);
+        vga_print("mkdir <DIR_NAME> - Creates a new directory at the user's chosen location\n", 0xFF, 0x00);
         vga_print("sleep <SECONDS> - Pauses the kernel for a user specified number of seconds\n", 0xFF, 0x00);
     }
     

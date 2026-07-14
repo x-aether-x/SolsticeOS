@@ -1,11 +1,12 @@
 #include "efi.h"
+#include "utils.h"
 
 #define KERNEL_LOCATION 0x100000
+#define BOOT_INFO_ADDR  0x9000
+#define MEM_MAP_COPY_ADDR 0x80000
 
-static EFI_GUID gEfiGraphicsOutputProtocolGuid = {0x9042a9de, 0x23dc, 0x4a38, {0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a}};
-static EFI_GUID gEfiLoadedImageProtocolGuid = {0x5B1B31A1, 0x9562, 0x11D2, {0x8E, 0x3F, 0x00, 0xA0, 0xC9, 0x69, 0x72, 0x3B}};
-static EFI_GUID gEfiSimpleFileSystemProtocolGuid = {0x964e5b22, 0x6459, 0x11d2, {0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
 
+// structs for the handoff to the kernel
 struct FramebufferInfo {
     UINT64 BaseAddress;
     UINT32 Width;
@@ -13,15 +14,22 @@ struct FramebufferInfo {
     UINT32 Pitch;
 };
 
-typedef void (*KernelEntry)(VOID*);
+struct BootInfo {
+    FramebufferInfo fb;
+    EFI_MEMORY_DESCRIPTOR* mem_map;
+    UINTN mem_map_size;
+    UINTN mem_desc_size;
+};
+
+// protocols we need to steal from UEFI
+static EFI_GUID gEfiGraphicsOutputProtocolGuid = {0x9042a9de, 0x23dc, 0x4a38, {0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a}};
+static EFI_GUID gEfiSimpleFileSystemProtocolGuid = {0x964e5b22, 0x6459, 0x11d2, {0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
+
+typedef void (*KernelEntry)(BootInfo*);
 
 extern "C" EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
     SystemTable->ConOut->ClearScreen(SystemTable->ConOut);  
-    SystemTable->ConOut->OutputString(SystemTable->ConOut, (CHAR16*)L"[START] Booting sequence started...b\n");
-
-    // locate loaded image
-    EFI_LOADED_IMAGE_PROTOCOL *loaded_image;
-    SystemTable->BootServices->HandleProtocol(ImageHandle, &gEfiLoadedImageProtocolGuid, (VOID**)&loaded_image);
+    SystemTable->ConOut->OutputString(SystemTable->ConOut, (CHAR16*)L"[START] Booting sequence started...\n");
 
     // locate file system handles
     UINTN handle_count;
@@ -32,28 +40,15 @@ extern "C" EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *
     EFI_FILE_PROTOCOL *kernel = NULL;
     EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* file_system = NULL;
 
-    SystemTable->ConOut->OutputString(SystemTable->ConOut, (CHAR16*)L"[DEBUG] Starting handle loop\n");
-
-    UINT64 kernel_addr = KERNEL_LOCATION;
-    SystemTable->BootServices->AllocatePages(AllocateAddress, EfiLoaderData, 512, &kernel_addr); // 2 MB @ 0x100000
-    UINT64 info_addr = 0x9000;
-    SystemTable->BootServices->AllocatePages(AllocateAddress, EfiLoaderData, 1, &info_addr);
-
+    // find our disk
     for(UINTN i = 0; i < handle_count; i++) {
-        if(handles[i] == nullptr) continue;
-
-        EFI_STATUS status = SystemTable->BootServices->HandleProtocol(handles[i], &gEfiSimpleFileSystemProtocolGuid, (VOID**)&file_system);
-        
-        if(status == EFI_SUCCESS && file_system != nullptr) {
-            if(file_system->OpenVolume(file_system, &root) == EFI_SUCCESS) {
-                SystemTable->ConOut->OutputString(SystemTable->ConOut, (CHAR16*)L"[DEBUG] Volume opened successfully!\n");
-                break;
-            }
+        if(SystemTable->BootServices->HandleProtocol(handles[i], &gEfiSimpleFileSystemProtocolGuid, (VOID**)&file_system) == EFI_SUCCESS) {
+            if(file_system->OpenVolume(file_system, &root) == EFI_SUCCESS) break;
         }
     } 
 
     if(root == nullptr) {
-        SystemTable->ConOut->OutputString(SystemTable->ConOut, (CHAR16*)L"Critical: could not find/open simplefilesystem volume!\n");
+        SystemTable->ConOut->OutputString(SystemTable->ConOut, (CHAR16*)L"Critical: could not find filesystem volume!\n");
         while(1);
     }
 
@@ -69,39 +64,48 @@ extern "C" EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *
     kernel->Close(kernel);
     root->Close(root);
 
-    // get graphics info
+    // get graphics info so the kernel knows how to draw
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
     SystemTable->BootServices->LocateProtocol(&gEfiGraphicsOutputProtocolGuid, NULL, (VOID**)&gop);
     
-    FramebufferInfo *fb_info = (FramebufferInfo*)0x9000;
-    fb_info->BaseAddress = (gop && gop->Mode) ? gop->Mode->FrameBufferBase : 0;
-    if (gop && gop->Mode && gop->Mode->Info) {
-        fb_info->Width = gop->Mode->Info->HorizontalResolution;
-        fb_info->Height = gop->Mode->Info->VerticalResolution;
-        fb_info->Pitch = gop->Mode->Info->PixelsPerScanLine * 4;
+    BootInfo *boot_info = (BootInfo*)BOOT_INFO_ADDR;
+    if (gop && gop->Mode) {
+        boot_info->fb.BaseAddress = gop->Mode->FrameBufferBase;
+        boot_info->fb.Width = gop->Mode->Info->HorizontalResolution;
+        boot_info->fb.Height = gop->Mode->Info->VerticalResolution;
+        boot_info->fb.Pitch = gop->Mode->Info->PixelsPerScanLine * 4;
     }
 
-    // prepare memory map and exit boot services
+    // prepare memory map for the kernel PMM
     UINTN map_size = 0;
     UINTN map_key = 0;
     UINTN desc_size = 0;
     UINT32 desc_ver = 0;
-    EFI_MEMORY_DESCRIPTOR* map = nullptr;
     
     // get map size
     SystemTable->BootServices->GetMemoryMap(&map_size, NULL, &map_key, &desc_size, &desc_ver);
-    map_size += 2 * desc_size;
+    map_size += 4 * desc_size; // buffer
     
-    // allocate buffer for map
+    EFI_MEMORY_DESCRIPTOR* map = nullptr;
     SystemTable->BootServices->AllocatePool(EfiLoaderData, map_size, (void**)&map);
     
-    // get map and exit
-    if (SystemTable->BootServices->GetMemoryMap(&map_size, map, &map_key, &desc_size, &desc_ver) == EFI_SUCCESS) {
-        SystemTable->BootServices->ExitBootServices(ImageHandle, map_key);
-    }
+    // get actual map
+    SystemTable->BootServices->GetMemoryMap(&map_size, map, &map_key, &desc_size, &desc_ver);
 
-    // jump to kernel
-    ((KernelEntry)KERNEL_LOCATION)((VOID*)0x9000);
+    boot_info->mem_map = map;
+    boot_info->mem_map_size = map_size;
+    boot_info->mem_desc_size = desc_size;
+
+    // saving boot map to memory
+    SystemTable->BootServices->CopyMem((VOID*)MEM_MAP_COPY_ADDR,(VOID*)boot_info->mem_map,boot_info->mem_map_size);
+
+    // Update the pointer in your BootInfo struct to point to the new safe location
+    boot_info->mem_map = (EFI_MEMORY_DESCRIPTOR*)MEM_MAP_COPY_ADDR;
+
+    // jump to kerneel
+    if (SystemTable->BootServices->ExitBootServices(ImageHandle, map_key) == EFI_SUCCESS) {
+        ((KernelEntry)KERNEL_LOCATION)(boot_info);
+    }
     
     return EFI_SUCCESS;
 }

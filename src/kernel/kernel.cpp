@@ -5,15 +5,9 @@
 #include "gdt.h"
 #include "idt.h"
 #include "timer.h"
+#include "memory.h"
 
 #define SERIAL_PORT 0x3F8
-
-struct FramebufferInfo {
-    uint64_t BaseAddress;
-    uint32_t Width;
-    uint32_t Height;
-    uint32_t Pitch;
-};
 
 // ---------------- SERIAL INITIALIZATION ----------------
 void init_serial() {
@@ -31,10 +25,13 @@ void _putchar(char c) {
     outb(SERIAL_PORT, c);
 }
 
-extern "C" int kernel_entry(FramebufferInfo* fb_info_ptr) {
-    FramebufferInfo* fb_info = (FramebufferInfo*)fb_info_ptr;
-    if (fb_info && fb_info->BaseAddress != 0) {
-        console_init((uint8_t*)fb_info->BaseAddress, fb_info->Width, fb_info->Height, fb_info->Pitch);
+extern "C" int kernel_entry(BootInfo* boot_info) {
+
+    if (boot_info && boot_info->fb.BaseAddress != 0) {
+        console_init((uint8_t*)boot_info->fb.BaseAddress, 
+                     boot_info->fb.Width, 
+                     boot_info->fb.Height, 
+                     boot_info->fb.Pitch);
     }
 
     init_serial();
@@ -43,6 +40,8 @@ extern "C" int kernel_entry(FramebufferInfo* fb_info_ptr) {
     init_mouse();
     remap_pic();
     init_timer(1000);
+    
+    init_pmm(boot_info->mem_map_size, boot_info->mem_desc_size);
 
     asm volatile ("sti");
 
@@ -50,6 +49,11 @@ extern "C" int kernel_entry(FramebufferInfo* fb_info_ptr) {
               "==            Solstice OS             ==\n"
               "========================================\n\n$ ", 0xFF, 0x00);
 
+
+    // PMM test
+    // void* test_page = pmm_alloc();
+    // printf("Allocated page at: %p\n", test_page);
+    
     while (1) { asm volatile ("hlt"); }
     return 1;
 }

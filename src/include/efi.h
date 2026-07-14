@@ -12,14 +12,24 @@ typedef void* EFI_HANDLE;
 
 #define EFIAPI __attribute__((ms_abi))
 #define EFI_SUCCESS 0
-#define NULL 0
 
 typedef enum {
-    EfiReservedMemoryType,   // 0
-    EfiLoaderCode,           // 1
-    EfiLoaderData,           // 2
-    EfiBootServicesCode,
-    EfiBootServicesData
+    EfiReservedMemoryType,      // 0: Not usable
+    EfiLoaderCode,              // 1: Usable (but holds your bootloader/kernel)
+    EfiLoaderData,              // 2: Usable (holds your BootInfo/MemMap)
+    EfiBootServicesCode,        // 3: Usable after ExitBootServices
+    EfiBootServicesData,        // 4: Usable after ExitBootServices
+    EfiRuntimeServicesCode,     // 5: Not usable (keep for UEFI runtime calls like shutdown)
+    EfiRuntimeServicesData,     // 6: Not usable 
+    EfiConventionalMemory,      // 7: FREE RAM! (This is what you want)
+    EfiUnusableMemory,          // 8: Bad RAM
+    EfiACPIReclaimMemory,       // 9: Usable after you parse ACPI tables
+    EfiACPIMemoryNVS,           // 10: Not usable (ACPI non-volatile)
+    EfiMemoryMappedIO,          // 11: Not usable (Device MMIO)
+    EfiMemoryMappedIOPortSpace, // 12: Not usable
+    EfiPalCode,                 // 13: Not usable
+    EfiPersistentMemory,        // 14: Not usable
+    EfiMaxMemoryType
 } EFI_MEMORY_TYPE;
 
 typedef enum {
@@ -108,7 +118,7 @@ struct EFI_BOOT_SERVICES {
 
     void* CalculateCrc32;
 
-    void* CopyMem;
+    void (EFIAPI *CopyMem)(VOID* Destination, VOID* Source, UINTN Length); 
     void* SetMem;
     void* CreateEventEx;
 };
