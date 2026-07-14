@@ -1,1 +1,1 @@
-Fully implement and setup ext2 filesystem
+Setup ext2 filesystem management across directories

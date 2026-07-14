@@ -3,6 +3,7 @@
 #include "printf.h"
 #include "console.h"
 #include "ext2.h"
+#include "timer.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -386,6 +387,7 @@ void execute_command(const char* command) {
         vga_print("ls - Lists the contents of the current directory\n", 0xFF, 0x00);
         vga_print("cd <DIR> - Change directory (cd .. to go up, cd / or bare cd for root)\n", 0xFF, 0x00);
         vga_print("mkdir <DIR_NAME> - Creates a new directory at the current path location", 0xFF, 0x00);
+        vga_print("sleep <SECONDS> - causes the thread to sleep for a number of seconds have elapsed\n", 0xFF, 0x00);
     }
     
     else if (strcmp(command, "clear") == true) {
@@ -436,6 +438,11 @@ void execute_command(const char* command) {
 
             ext2_mkdir(dir_name, g_current_dir, 0x1F0);
         }
+    }
+    else if (starts_with(command, "sleep") == true) {
+        const char* arg = next_arg(command + 5);
+        uint32_t seconds = string_to_int(arg);
+        sleep(seconds * 1000); 
     } 
     else {
         vga_print("Unknown command: ", 0xFF, 0x00);
@@ -463,9 +470,8 @@ void remap_pic() {
     outb(PIC1_DATA, 0x01);
     outb(PIC2_DATA, 0x01);
 
-    // mask interrupts until idt is setup
-    outb(PIC1_DATA, 0xFD); // unmask IRQ1 (keyboard) only
-    outb(PIC2_DATA, 0xFF);
+    outb(PIC1_DATA, 0xF8); // unmask IRQ0, 1, and 2
+    outb(PIC2_DATA, 0xEF);
 }
 
 void kernel_panic() {

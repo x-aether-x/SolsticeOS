@@ -11,7 +11,13 @@ To make interrupts working, you need three main parts:
 
 IRQs I've setup
 
+IRQ0 - Timer Interrupts
+    Essentialy works like ticks in a video game, every thousandth of a second, this interrupt will fire and it is a way of keeping track of real time
+    It is tested using the sleep command in the terminal, allowing you to pause the kernel for a user-specified number of seconds
+
 IRQ1 - Keyboard Interrupts 
     When a button on the keyboard is pressed, it prints to the screen using the vga_print() function.
     It also saves the letter to a variable called buffer_index, which contains the current command being typed into the console.
 
+IRQ12 - Mouse Interrupts
+    Setup for later when I make my window manager, as of now, it successfully detects the mouse interrupts and does nothing about it

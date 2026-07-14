@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "gdt.h"
 #include "idt.h"
+#include "timer.h"
 
 #define SERIAL_PORT 0x3F8
 
@@ -39,7 +40,9 @@ extern "C" int kernel_entry(FramebufferInfo* fb_info_ptr) {
     init_serial();
     initGdt();
     initIdt();
+    init_mouse();
     remap_pic();
+    init_timer(1000);
 
     asm volatile ("sti");
 

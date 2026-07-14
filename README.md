@@ -21,6 +21,8 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
   ls - Lists the contents of the current working directory
 
   mkdir \<DIR_NAME\> - Creates a new directory at the current path location
+  
+  sleep \<SECONDS\> - Pauses the kernel for a user specified number of seconds
 
 ### Dependencies
 

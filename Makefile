@@ -13,7 +13,7 @@ FONT_SRC = src/include/FreeSans.sfn
 FONT_RAW = build/FreeSans.sfn
 FONT_OBJ = build/font.o
 
-OBJS = build/kernel_entry.o build/kernel.o build/printf.o build/console.o build/gdtc.o build/gdts.o build/utils.o build/idtc.o build/idts.o build/ext2.o $(FONT_OBJ)
+OBJS = build/kernel_entry.o build/kernel.o build/printf.o build/console.o build/gdtc.o build/gdts.o build/utils.o build/idtc.o build/idts.o build/ext2.o build/timer.o $(FONT_OBJ)
 
 all: prepare build/kernel.bin build/BOOTX64.EFI
 
@@ -30,6 +30,9 @@ build/printf.o: src/kernel/misc/printf.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 build/ext2.o: src/kernel/filesystem/ext2.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/timer.o: src/kernel/idt/timer.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 build/console.o: src/kernel/misc/console.cpp
