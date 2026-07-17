@@ -26,7 +26,6 @@ void _putchar(char c) {
 }
 
 extern "C" int kernel_entry(BootInfo* boot_info) {
-
     if (boot_info && boot_info->fb.BaseAddress != 0) {
         console_init((uint8_t*)boot_info->fb.BaseAddress, 
                      boot_info->fb.Width, 
@@ -42,13 +41,13 @@ extern "C" int kernel_entry(BootInfo* boot_info) {
     init_timer(1000);
     
     init_pmm(boot_info->mem_map_size, boot_info->mem_desc_size);
+    init_paging();
 
     asm volatile ("sti");
 
     vga_print("========================================\n"
               "==            Solstice OS             ==\n"
               "========================================\n\n$ ", 0xFF, 0x00);
-
 
     // PMM test
     // void* test_page = pmm_alloc();

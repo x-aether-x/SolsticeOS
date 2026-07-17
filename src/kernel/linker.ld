@@ -3,6 +3,7 @@ ENTRY(_start)
 SECTIONS
 {
     . = 0x100000;
+    _kernel_start = .;
     .text : ALIGN(4K) {
         *(.text._start)
         *(.text)
@@ -15,5 +16,7 @@ SECTIONS
         *(.bss) *(.bss.*) *(COMMON)
         __bss_end = .;
     }
+
+    _kernel_end = .;
     /DISCARD/ : { *(.note*) *(.comment*) *(.eh_frame*) }
 }
