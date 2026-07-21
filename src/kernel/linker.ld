@@ -16,7 +16,6 @@ SECTIONS
         *(.bss) *(.bss.*) *(COMMON)
         __bss_end = .;
     }
-
     _kernel_end = .;
     /DISCARD/ : { *(.note*) *(.comment*) *(.eh_frame*) }
 }

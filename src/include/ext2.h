@@ -9,9 +9,6 @@ extern uint32_t BG_BLOCK_BITMAP_BLOCK;
 extern uint32_t BG_INODE_BITMAP_BLOCK;
 extern uint32_t BG_INODE_TABLE_BLOCK;
 
-extern uint32_t g_current_dir;
-extern char g_current_path[256];
-
 struct ext2_superblock {
     uint32_t s_inodes_count;      // Inodes count
     uint32_t s_blocks_count;      // Blocks count
@@ -136,15 +133,17 @@ struct ext2_dir_entry {
 bool ext2_init(uint32_t start_lba, uint16_t port);
 uint32_t get_inode_table(uint16_t port);
 void ext2_read_block(uint32_t block_num, void* buffer, uint16_t port);
+void ext2_write_block(uint32_t block, void* buffer, uint16_t port);
 void list_directory(uint32_t block_num, uint16_t port);
 void read_root_inode(uint16_t port);
-void ext2_ls_root(uint16_t port);
-void ext2_read_block(uint32_t block, void* buffer, uint16_t port);
-void ext2_write_block(uint32_t block, void* buffer, uint16_t port);
+uint32_t ext2_traverse_path(const char* path, uint16_t port, uint32_t* out_parent = nullptr, char* out_name = nullptr);
+uint32_t ext2_find_in_dir(uint32_t dir_inode_num, const char* name, uint8_t* out_type, uint16_t port);
+bool ext2_cd(const char* path, uint16_t port);
+void ext2_ls(const char* path, uint16_t port);
 bool ext2_mkdir(const char* path, uint16_t port);
+bool ext2_link_dir_entry(uint32_t parent_inode_num, const char* name, uint32_t new_inode, uint8_t type, uint16_t port);
 uint32_t ext2_alloc_block(uint16_t port);
 uint32_t ext2_alloc_inode(uint16_t port);
-void ext2_read_inode(uint32_t inode_num, ext2_inode* buffer, uint16_t port); 
-uint32_t ext2_find_in_dir(uint32_t dir_inode_num, const char* name, uint8_t* out_type, uint16_t port);
-bool ext2_cd(const char* name, uint16_t port);
-void ext2_ls(const char* path, uint16_t port);
+void ext2_read_inode(uint32_t inode_num, ext2_inode* buffer, uint16_t port);
+void ext2_write_inode(uint32_t inode_num, ext2_inode* inode_data, uint16_t port);
+const char* ext2_get_path();

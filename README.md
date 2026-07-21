@@ -1,7 +1,7 @@
 # SolsticeOS
 
-A custom bare-bones operating system running on 64-bit protected/long mode, complete with a custom UEFI bootloader, gdt, idt, keyboard interrupts, stack implementation, and a working console with basic shell commands, and backspace support!
-I am no longer using the printf function here, as it was no longer working with my recent switch to UEFI [A simple printf implimentation](https://github.com/mpaland/printf/tree/master).
+A custom bare-bones operating system running on 64-bit protected/long mode, complete with a custom UEFI bootloader, gdt, idt, keyboard interrupts, stack implementation, and a working console with basic shell commands, and malloc!
+I am not using this printf function anymore, as it was no longer working with my recent switch to UEFI [A simple printf implimentation](https://github.com/mpaland/printf/tree/master).
 
 btw i put in alot of effort into this and I'd really appreciate a star as it really does go a long way!
 

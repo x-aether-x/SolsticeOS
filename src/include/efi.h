@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef NULL
+#define NULL 0
+#endif
+
 typedef unsigned long long UINT64;
 typedef unsigned long long UINTN;
 typedef unsigned int       UINT32;

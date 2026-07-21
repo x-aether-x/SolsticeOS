@@ -19,11 +19,14 @@ static bool g_ext2_initialized = false;
 uint32_t g_current_dir = 2; 
 char g_current_path[256] = "/";
 
+const char* ext2_get_path() { return g_current_path; } // used by print_prompt
+
 uint32_t BG_BLOCK_BITMAP_BLOCK = 0;
 uint32_t BG_INODE_BITMAP_BLOCK = 0;
 uint32_t BG_INODE_TABLE_BLOCK = 0;
 
 bool ext2_init(uint32_t start_lba, uint16_t port) {
+    (void)start_lba;
     if (g_ext2_initialized) return true; // already done
 
     uint8_t buffer[1024];
@@ -57,7 +60,7 @@ void ext2_read_block(uint32_t block_num, void* buffer, uint16_t port) {
 }
 
 uint32_t get_inode_table(uint16_t port) {
-    uint8_t buffer[512];
+    uint8_t buffer[1024]; // block-sized: ext2_read_block writes g_block_size bytes
     ext2_read_block(2, buffer, port);
     printf("DEBUG: First 4 bytes of BGDT block: %x\n", *(uint32_t*)buffer);
     struct ext2_bg_descriptor *bg_desc = (struct ext2_bg_descriptor *)buffer;
@@ -67,7 +70,8 @@ uint32_t get_inode_table(uint16_t port) {
     return bg_desc->bg_inode_table;
 }
 
-uint32_t ext2_traverse_path(const char* path, uint16_t port, uint32_t* out_parent = nullptr, char* out_name = nullptr) { // traverses paths (this is why we clash)
+// defaults for out_parent/out_name live in ext2.h - C++ forbids repeating them here
+uint32_t ext2_traverse_path(const char* path, uint16_t port, uint32_t* out_parent, char* out_name) { // traverses paths (this is why we clash)
     uint32_t curr_inode = (path[0] == '/') ? 2 : g_current_dir;
 
     if (strcmp(path, "/") == true) {
@@ -82,7 +86,7 @@ uint32_t ext2_traverse_path(const char* path, uint16_t port, uint32_t* out_paren
 
     while (path[i] != '\0') {
         int j = 0;
-        while (path[i] != '\0' && path[i] != '/') {
+        while (path[i] != '\0' && path[i] != '/' && j < 255) {
             comp[j++] = path[i++];
         }
         comp[j] = '\0';
@@ -150,51 +154,6 @@ void read_root_inode(uint16_t port) {
     list_directory(root_inode->i_block[0], port);
 }
 
-void ext2_ls_root(uint16_t port) {
-    if (!ext2_init(0, port)) {
-        vga_print("Error: Filesystem not initialized!\n", 0xFF, 0x00);
-        return;
-    }
-
-    uint8_t* inode_buffer = (uint8_t*)0x20000; 
-    uint8_t* dir_buffer   = (uint8_t*)0x21000; 
-
-    read_disk(BG_INODE_TABLE_BLOCK * 2, 2, (uintptr_t)inode_buffer, port); // block -> LBA (1K blocks = 2 sectors)
-    ext2_inode* root_inode = (ext2_inode*)(inode_buffer + 128); // inode 2 = index 1, 128-byte inodes
-    uint32_t dir_block = root_inode->i_block[0];
-
-    // switch block id to lba (multiply by two)
-    uint32_t dir_lba = dir_block * 2;
-    read_disk(dir_lba, 2, (uintptr_t)dir_buffer, port);
-
-    uint32_t offset = 0;
-    
-    vga_print("Root Directory Contents:\n", 0x03, 0x00);
-
-    // loop through the block
-    while (offset < 1024) {
-        ext2_dir_entry* entry = (ext2_dir_entry*)(dir_buffer + offset);
-
-        // if inode is 0 its not too bad but still pretty bad
-        // if rec_len is 0 youre frapped
-        if (entry->inode == 0 || entry->rec_len == 0) {
-            break; 
-        }
-
-        for (int i = 0; i < entry->name_len; i++) {
-            int color = (entry->file_type == 2) ? 0x09 : 0x0F; // blue is dirs, white is files
-            
-            char c[2] = { entry->name[i], '\0' };
-            vga_print(c, color, 0x00);
-        }
-        
-        vga_print("   ", 0xFF, 0x00); // spaces between filenames
-        offset += entry->rec_len;
-    }
-    
-    vga_print("\n", 0xFF, 0x00);
-}
-
 static bool name_matches(ext2_dir_entry* e, const char* name) {
     int len = strlen(name);
     if (e->name_len != len) return false;
@@ -227,19 +186,19 @@ uint32_t ext2_find_in_dir(uint32_t dir_inode_num, const char* name, uint8_t* out
 
 bool ext2_cd(const char* path, uint16_t port) { // waay simpler then before cos i implemented the path traversla function
     if (!ext2_init(0, port)) {
-        vga_print("Error: Filesystem not initialized!\n", 0xFF, 0x00);
+        vga_print("Error: Filesystem not initialized!\n", 0x04, 0x00);
         return false;
     }
     uint32_t target_inode = ext2_traverse_path(path, port);
     
     if (target_inode == 0) {
-        vga_print("cd: no such file or directory\n", 0xFF, 0x00);
+        vga_print("cd: no such file or directory\n", 0x04, 0x00);
         return false;
     }
     ext2_inode check_inode;
     ext2_read_inode(target_inode, &check_inode, port);
     if ((check_inode.i_mode & EXT2_S_IFDIR) == 0) {
-        vga_print("cd: not a directory\n", 0xFF, 0x00);
+        vga_print("cd: not a directory\n", 0x04, 0x00);
         return false;
     }
 
@@ -274,7 +233,7 @@ bool ext2_cd(const char* path, uint16_t port) { // waay simpler then before cos 
 // lists the current directory but can also list other directories now yay
 void ext2_ls(const char* path, uint16_t port) {
     if (!ext2_init(0, port)) {
-        vga_print("Error: Filesystem not initialized!\n", 0xFF, 0x00);
+        vga_print("Error: Filesystem not initialized!\n", 0x04, 0x00);
         return;
     }
 
@@ -282,7 +241,7 @@ void ext2_ls(const char* path, uint16_t port) {
     if (path && path[0] != '\0') {
         target_inode = ext2_traverse_path(path, port);
         if (target_inode == 0) {
-            vga_print("ls: cannot access path: No such file or directory\n", 0xFF, 0x00);
+            vga_print("ls: cannot access path: No such file or directory\n", 0x04, 0x00);
             return;
         }
     }
@@ -299,14 +258,14 @@ void ext2_ls(const char* path, uint16_t port) {
         if (entry->inode == 0 || entry->rec_len == 0) break;
 
         for (int i = 0; i < entry->name_len; i++) {
-            int color = (entry->file_type == 2) ? 0x09 : 0x0F;
+            int color = (entry->file_type == 2) ? 0x0D : 0x0F; // dirs light pink
             char c[2] = { entry->name[i], '\0' };
             vga_print(c, color, 0x00);
         }
-        vga_print("   ", 0xFF, 0x00);
+        vga_print("   ", 0x0F, 0x00);
         offset += entry->rec_len;
     }
-    vga_print("\n", 0xFF, 0x00);
+    vga_print("\n", 0x0F, 0x00);
 }
 
 void ext2_write_block(uint32_t block, void* buffer, uint16_t port) {
@@ -382,7 +341,6 @@ bool ext2_link_dir_entry(uint32_t parent_inode_num, const char* name, uint32_t n
     
     uint32_t offset = 0;
     int loop_guard = 0;
-    ext2_dir_entry* entry = nullptr;
 
     while (offset < 1024 && loop_guard < 100) {
         ext2_dir_entry* entry = (ext2_dir_entry*)(block_buffer + offset);
@@ -420,7 +378,7 @@ bool ext2_link_dir_entry(uint32_t parent_inode_num, const char* name, uint32_t n
         loop_guard++;
     }
 
-    vga_print("Error: Parent directory block is full.\n", 0xFF, 0x00);
+    vga_print("Error: Parent directory block is full.\n", 0x04, 0x00);
     return false;
 }
 
@@ -439,7 +397,7 @@ void ext2_read_inode(uint32_t inode_num, ext2_inode* buffer, uint16_t port) {
 
 bool ext2_mkdir(const char* path, uint16_t port) {
     if (!ext2_init(0, port)) {
-        vga_print("Error: Filesystem not initialized!\n", 0xFF, 0x00);
+        vga_print("Error: Filesystem not initialized!\n", 0x04, 0x00);
         return false;
     }
 
@@ -449,23 +407,23 @@ bool ext2_mkdir(const char* path, uint16_t port) {
     uint32_t existing_inode = ext2_traverse_path(path, port, &parent_inode_num, dir_name);
     
     if (existing_inode != 0) {
-        vga_print("mkdir: cannot create directory: File exists\n", 0xFF, 0x00);
+        vga_print("mkdir: cannot create directory: File exists\n", 0x04, 0x00);
         return false;
     }
     if (parent_inode_num == 0) {
-        vga_print("mkdir: cannot create directory: No such parent directory\n", 0xFF, 0x00);
+        vga_print("mkdir: cannot create directory: No such parent directory\n", 0x04, 0x00);
         return false;
     }
 
     uint32_t new_inode_num = ext2_alloc_inode(port);
     if (new_inode_num == 0) {
-        vga_print("mkdir: No free inodes.\n", 0xFF, 0x00);
+        vga_print("mkdir: No free inodes.\n", 0x04, 0x00);
         return false;
     }
 
     uint32_t new_block_num = ext2_alloc_block(port);
     if (new_block_num == 0) {
-        vga_print("mkdir: No free blocks.\n", 0xFF, 0x00);
+        vga_print("mkdir: No free blocks.\n", 0x04, 0x00);
         return false;
     }
 
@@ -507,7 +465,7 @@ bool ext2_mkdir(const char* path, uint16_t port) {
 
     bool linked = ext2_link_dir_entry(parent_inode_num, dir_name, new_inode_num, EXT2_FT_DIR, port);
     if (!linked) {
-        vga_print("mkdir: Failed to link to parent.\n", 0xFF, 0x00);
+        vga_print("mkdir: Failed to link to parent.\n", 0x04, 0x00);
         return false;
     }
 

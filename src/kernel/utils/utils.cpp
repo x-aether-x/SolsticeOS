@@ -3,6 +3,7 @@
 #include "printf.h"
 #include "console.h"
 #include "ext2.h"
+#include "memory.h"
 #include "timer.h"
 #include <stdint.h>
 #include <stddef.h>
@@ -218,15 +219,19 @@ void scroll_screen() {
 }
 
 void vga_putc(char c, int txt_col, int bg_col) {
-    (void)txt_col;
-    (void)bg_col;
+    console_set_color(txt_col, bg_col);
     console_putc(c);
 }
 
 void vga_print(const char *str, int txt_col, int bg_col) {
-    (void)txt_col;
-    (void)bg_col;
+    console_set_color(txt_col, bg_col);
     console_puts(str);
+}
+
+void print_prompt() {
+    vga_print(ext2_get_path(), 0x09, 0x00); // light violet path
+    vga_print(" $ ", 0x0C, 0x00);           // hot pink $
+    console_set_color(0x0F, 0x00);          // typed text: lavender white
 }
 
 void hex_dump(void* addr, int len) {
@@ -290,43 +295,24 @@ bool strcmp(const char *s1, const char *s2) {
     }
 }
 
-char* strcpy(char* dest, const char* src) {
-    if (dest == nullptr || src == nullptr) {
-        return dest;
-    }
-
-    char* ptr = dest;
-    while (*src != '\0') {
-        *ptr++ = *src++;
-    }
-    *ptr = '\0';
-    return dest;
-}
-
-char* strcat(char* dest, const char* src) {
-    if (dest == nullptr || src == nullptr) {
-        return dest;
-    }
-
-    char* ptr = dest;
-    while (*ptr != '\0') {
-        ptr++;
-    }
-
-    while (*src != '\0') {
-        *ptr++ = *src++;
-    }
-    *ptr = '\0';
-    return dest;
-}
-
-
 int strlen(const char* str) {
     int len = 0;
     while (str[len] != '\0') {
         len++;
     }
     return len;
+}
+
+char* strcpy(char* dest, const char* src) {
+    char* d = dest;
+    while ((*d++ = *src++) != '\0');
+    return dest;
+}
+
+char* strcat(char* dest, const char* src) {
+    char* d = dest + strlen(dest);
+    while ((*d++ = *src++) != '\0');
+    return dest;
 }
 
 bool starts_with(const char* str, const char* prefix) {
@@ -384,10 +370,10 @@ void execute_command(const char* command) {
         vga_print("clear - Clear the screen\n", 0xFF, 0x00);
         vga_print("echo <TEXT> - Display a line of text\n", 0xFF, 0x00);
         vga_print("readdisk <SEGMENT> - Reads user specified LBA and returns a hex dump of the chosen sector\n", 0xFF, 0x00);
-        vga_print("ls <DIR>- Lists the contents of the current directory by default, but can also list contents of other directories if they are provided\n", 0xFF, 0x00);
+        vga_print("ls - Lists the contents of the current directory\n", 0xFF, 0x00);
         vga_print("cd <DIR> - Change directory (cd .. to go up, cd / or bare cd for root)\n", 0xFF, 0x00);
-        vga_print("mkdir <DIR_NAME> - Creates a new directory at the user's chosen location\n", 0xFF, 0x00);
-        vga_print("sleep <SECONDS> - Pauses the kernel for a user specified number of seconds\n", 0xFF, 0x00);
+        vga_print("mkdir <DIR_NAME> - Creates a new directory with a specified name at a given directory (current dir by default)\n", 0xFF, 0x00);
+        vga_print("sleep <SECONDS> - Sleep for the given number of seconds\n", 0xFF, 0x00);
     }
     
     else if (strcmp(command, "clear") == true) {
@@ -401,7 +387,11 @@ void execute_command(const char* command) {
         const char* arg = command + 9;
         uint32_t lba = string_to_int((char*)arg);
         if (is_number(arg) == true) {
-            uint8_t* file_buffer = (uint8_t*)0x20000;
+            uint8_t* file_buffer = (uint8_t*)kmalloc(512);
+            if (file_buffer == nullptr) {
+                vga_print("readdisk: out of memory\n", 0x04, 0x00);
+                return;
+            }
 
             read_disk(lba, 1, (uintptr_t)file_buffer, 0x1F0);
 
@@ -411,21 +401,15 @@ void execute_command(const char* command) {
             
             // full sector (512 bytes)
             hex_dump(file_buffer, 512);
+            kfree(file_buffer);
         }
         else {
             vga_print("Error: Invalid LBA Specified\n", 0xff, 0x00);
         }
     }
-    else if (strcmp(command, "ls") == true) {
-        ext2_ls(g_current_path, 0x1f0);
-    }
-    else if (starts_with(command, "ls") == true) {
-        const char* dir_name = next_arg(command + 2);
-        if (strlen(dir_name) == 0) {
-            ext2_ls("/", 0x1F0); // bare cd goes to root
-        } else {
-            ext2_ls(dir_name, 0x1F0);
-        }
+    else if (starts_with(command, "ls") == true && (command[2] == ' ' || command[2] == '\0')) {
+        const char* path = next_arg(command + 2);
+        ext2_ls(path, 0x1F0);
     }
     else if (starts_with(command, "cd") == true && (command[2] == ' ' || command[2] == '\0')) {
         const char* dir_name = next_arg(command + 2);
@@ -433,6 +417,14 @@ void execute_command(const char* command) {
             ext2_cd("/", 0x1F0); // bare cd goes to root
         } else {
             ext2_cd(dir_name, 0x1F0);
+        }
+    }
+    else if (starts_with(command, "sleep") == true) {
+        const char* arg = next_arg(command + 5);
+        if (is_number(arg) == false) {
+            vga_print("sleep: invalid time (seconds)\n", 0x04, 0x00);
+        } else {
+            sleep(string_to_int((char*)arg));
         }
     }
     else if (starts_with(command, "mkdir") == true) {
@@ -446,11 +438,6 @@ void execute_command(const char* command) {
 
             ext2_mkdir(dir_name, 0x1F0);
         }
-    }
-    else if (starts_with(command, "sleep") == true) {
-        const char* arg = next_arg(command + 5);
-        uint32_t seconds = string_to_int(arg);
-        sleep(seconds * 1000); 
     } 
     else {
         vga_print("Unknown command: ", 0xFF, 0x00);
@@ -478,8 +465,9 @@ void remap_pic() {
     outb(PIC1_DATA, 0x01);
     outb(PIC2_DATA, 0x01);
 
-    outb(PIC1_DATA, 0xF8); // unmask IRQ0, 1, and 2
-    outb(PIC2_DATA, 0xEF);
+    // mask interrupts until idt is setup
+    outb(PIC1_DATA, 0xF8); // unmask IRQ0 (timer), IRQ1 (keyboard), IRQ2 (cascade)
+    outb(PIC2_DATA, 0xEF); // unmask IRQ12 (mouse)
 }
 
 void kernel_panic() {

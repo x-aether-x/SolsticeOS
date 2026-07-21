@@ -41,6 +41,7 @@ void kputs(const char* s) {
 }
 
 extern "C" int printf(const char* format, ...) {
+    console_set_color(0x0F, 0x00); // printf always default white on black
     va_list args;
     va_start(args, format);
 
@@ -72,6 +73,7 @@ extern "C" int printf(const char* format, ...) {
 }
 
 extern "C" void kprintf(const char* format, ...) {
+    console_set_color(0x0F, 0x00);
     va_list args;
     va_start(args, format);
 

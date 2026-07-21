@@ -105,8 +105,7 @@ void initIdt() {
 
     for (int i = 0; i < 61; i++) {
         setIdtGate(i, (uint64_t)isr_stub_table[i], 0x08, 0x8E);
-    }// this stupid loop doesnt work for like zero reason and i cannot figure it out for the life of me so i have to define all my interrupts manually ;-; 
-
+    }
 
     idt_flush((uint64_t)&idt_ptr);
 }
@@ -211,7 +210,8 @@ extern "C" void interrupt_handler(struct registers* regs) {
             
             execute_command(shell_buffer);
             
-            printf("\n%s $ ", g_current_path);
+            vga_print("\n", 0x0F, 0x00);
+            print_prompt(); // colored path + $ (printf would force it all white)
             buffer_index = 0;
             shell_buffer[0] = '\0';
         } 
@@ -228,4 +228,4 @@ extern "C" void interrupt_handler(struct registers* regs) {
             shell_buffer[buffer_index] = '\0';
         }
     }
-} 
+}

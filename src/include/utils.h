@@ -16,6 +16,7 @@ void hex_dump(void* addr, int len); // prints hexes instead of weird symbols
 void update_hardware_cursor(int col, int row);
 const char* next_arg(const char* str); 
 void execute_command(const char* command); // execute a command from shell_buffer
+void print_prompt(); // colored path + $ // execute a command from shell_buffer
 
 int strlen(const char* str);
 bool strcmp(const char *s1, const char *s2); // custom: returns true when equal

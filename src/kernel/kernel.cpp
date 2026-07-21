@@ -4,8 +4,8 @@
 #include "utils.h"
 #include "gdt.h"
 #include "idt.h"
-#include "timer.h"
 #include "memory.h"
+#include "timer.h"
 
 #define SERIAL_PORT 0x3F8
 
@@ -25,34 +25,41 @@ void _putchar(char c) {
     outb(SERIAL_PORT, c);
 }
 
-extern "C" int kernel_entry(BootInfo* boot_info) {
-    if (boot_info && boot_info->fb.BaseAddress != 0) {
-        console_init((uint8_t*)boot_info->fb.BaseAddress, 
-                     boot_info->fb.Width, 
-                     boot_info->fb.Height, 
-                     boot_info->fb.Pitch);
+extern "C" int kernel_entry(FramebufferInfo* fb_info_ptr) {
+    FramebufferInfo* fb_info = (FramebufferInfo*)fb_info_ptr;
+    if (fb_info && fb_info->BaseAddress != 0) {
+        console_init((uint8_t*)fb_info->BaseAddress, fb_info->Width, fb_info->Height, fb_info->Pitch);
     }
 
     init_serial();
     initGdt();
     initIdt();
-    init_mouse();
     remap_pic();
-    init_timer(1000);
-    
-    init_pmm(boot_info->mem_map_size, boot_info->mem_desc_size);
+
+    if (fb_info) {
+        init_pmm((uint32_t)fb_info->MapSize, (uint32_t)fb_info->DescSize);
+    }
+    init_kmalloc();
     init_paging();
+    init_timer(1000);
+    init_mouse();
 
     asm volatile ("sti");
 
-    vga_print("========================================\n"
-              "==            Solstice OS             ==\n"
-              "========================================\n\n$ ", 0xFF, 0x00);
+    vga_print(".========================================.\n", 0x05, 0x00);
+    vga_print("|   *  .    ", 0x06, 0x00);
+    vga_print("S o l s t i c e  O S", 0x0C, 0x00);
+    vga_print("    .  *  |\n", 0x06, 0x00);
+    vga_print("'========================================'\n", 0x05, 0x00);
+    vga_print("  mem: ", 0x08, 0x00);
+    printf("%u", (unsigned int)(total_free_pages * 4 / 1024));
+    vga_print(" MB free\n\n", 0x08, 0x00);
+    print_prompt();
 
     // PMM test
     // void* test_page = pmm_alloc();
-    // printf("Allocated page at: %p\n", test_page);
-    
+    // printf("Allocated page at: %p\n", test_page); 
+
     while (1) { asm volatile ("hlt"); }
     return 1;
 }
