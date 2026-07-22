@@ -38,7 +38,7 @@ extern "C" EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *
 
     UINT64 kernel_addr = KERNEL_LOCATION;
     SystemTable->BootServices->AllocatePages(AllocateAddress, EfiLoaderData, 512, &kernel_addr); // 2 MB @ 0x100000
-    UINT64 info_addr = 0x9000;
+    UINT64 info_addr = 0x9000; // framebuffer location
     SystemTable->BootServices->AllocatePages(AllocateAddress, EfiLoaderData, 1, &info_addr);
 
     for(UINTN i = 0; i < handle_count; i++) {

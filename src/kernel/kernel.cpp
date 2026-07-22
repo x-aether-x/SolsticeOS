@@ -35,12 +35,12 @@ extern "C" int kernel_entry(FramebufferInfo* fb_info_ptr) {
     initGdt();
     initIdt();
     remap_pic();
+    init_paging();
 
     if (fb_info) {
         init_pmm((uint32_t)fb_info->MapSize, (uint32_t)fb_info->DescSize);
     }
     init_kmalloc();
-    init_paging();
     init_timer(1000);
     init_mouse();
 
