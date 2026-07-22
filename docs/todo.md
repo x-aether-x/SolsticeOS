@@ -1,1 +1,2 @@
-Fix sleep command
+Setup a scheduler
+Setup a WM
