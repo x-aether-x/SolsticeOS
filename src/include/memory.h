@@ -67,3 +67,5 @@ void init_paging();
 void init_kmalloc();
 void* kmalloc(uint64_t target);
 void kfree(void* ptr);
+
+void* pmm_alloc_pages(uint64_t count);

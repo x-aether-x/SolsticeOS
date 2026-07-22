@@ -6,6 +6,7 @@
 #include "idt.h"
 #include "memory.h"
 #include "timer.h"
+#include "gfx.h"
 
 #define SERIAL_PORT 0x3F8
 
@@ -41,6 +42,7 @@ extern "C" int kernel_entry(FramebufferInfo* fb_info_ptr) {
         init_pmm((uint32_t)fb_info->MapSize, (uint32_t)fb_info->DescSize);
     }
     init_kmalloc();
+    gfx_init(fb_info);
     init_timer(1000);
     init_mouse();
 

@@ -128,6 +128,18 @@ void init_paging() {
     identity_map_range(0x9000, 4096);
 }
 
+void* pmm_alloc_pages(uint64_t count) {
+    if (count == 0) return nullptr;
+    void* first = pmm_alloc();
+    if (first == nullptr) return nullptr;
+    for (uint64_t i = 1; i < count; i++) {
+        if (pmm_alloc() == nullptr) {
+            return nullptr;
+        }
+    }
+    return first;
+}
+
 // -------------- SLAB ALLOCATOR ------------------
 
 void init_kmalloc() {

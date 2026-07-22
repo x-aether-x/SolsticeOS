@@ -5,6 +5,7 @@
 #include "ext2.h"
 #include "memory.h"
 #include "timer.h"
+#include "gfx.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -374,6 +375,7 @@ void execute_command(const char* command) {
         vga_print("cd <DIR> - Change directory (cd .. to go up, cd / or bare cd for root)\n", 0xFF, 0x00);
         vga_print("mkdir <DIR_NAME> - Creates a new directory with a specified name at a given directory (current dir by default)\n", 0xFF, 0x00);
         vga_print("sleep <SECONDS> - Sleep for the given number of seconds\n", 0xFF, 0x00);
+        vga_print("testgfx - Prints a quick test for the GFX, which tests different gfx functions. (run clear command after)\n", 0xff, 0x00);
     }
     
     else if (strcmp(command, "clear") == true) {
@@ -438,6 +440,12 @@ void execute_command(const char* command) {
 
             ext2_mkdir(dir_name, 0x1F0);
         }
+    }
+    else if (strcmp(command, "testgfx") == true) {
+        gfx_fill_rect(100, 100, 200, 150, 0xFF0000FF); // blue rect
+        gfx_draw_rect(50, 50, 300, 250, 0xFF00FF00);   // green outline
+        gfx_draw_string(60, 60, "Hello GFX", 0xFFFFFF00, 0xFF000000); // yellow text
+        gfx_present();
     } 
     else {
         vga_print("Unknown command: ", 0xFF, 0x00);

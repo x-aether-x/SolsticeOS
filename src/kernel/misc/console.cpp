@@ -139,3 +139,40 @@ void console_putc(char c) {
 }
 
 void console_puts(const char* s) { for (; *s; s++) console_putc(*s); }
+
+int console_draw_glyph(uint32_t* target, int pitch_bytes, int x, int y,
+                          char c, uint32_t fg, uint32_t bg) {
+    // save whatever the console was using
+    uint8_t* saved_ptr   = ssfn_dst.ptr;
+    int      saved_p     = ssfn_dst.p;
+    int      saved_w     = ssfn_dst.w;
+    int      saved_h     = ssfn_dst.h;
+    int      saved_x     = ssfn_dst.x;
+    int      saved_y     = ssfn_dst.y;
+    uint32_t saved_fg    = ssfn_dst.fg;
+    uint32_t saved_bg    = ssfn_dst.bg;
+
+    ssfn_dst.ptr = (uint8_t*)target;
+    ssfn_dst.p   = pitch_bytes;
+    ssfn_dst.w   = g_console.width;   // clip bounds = screen dims
+    ssfn_dst.h   = g_console.height;
+    ssfn_dst.x   = x;
+    ssfn_dst.y   = y;
+    ssfn_dst.fg  = fg;
+    ssfn_dst.bg  = bg;
+
+    ssfn_putc((uint32_t)(unsigned char)c);
+
+    int advance = ssfn_dst.x - x;   // how far the glyph moved the cursor
+
+    ssfn_dst.ptr = saved_ptr;
+    ssfn_dst.p   = saved_p;
+    ssfn_dst.w   = saved_w;
+    ssfn_dst.h   = saved_h;
+    ssfn_dst.x   = saved_x;
+    ssfn_dst.y   = saved_y;
+    ssfn_dst.fg  = saved_fg;
+    ssfn_dst.bg  = saved_bg;
+
+    return advance > 0 ? advance : 8;  // fall back if the font didn't advance
+}
