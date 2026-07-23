@@ -9,7 +9,9 @@
 #define SSFN_IMPLEMENTATION
 #include "ssfn.h"
 #include "utils.h"
- 
+
+extern void wm_mark_dirty();
+
 static struct console_buffer g_console;
 static int g_font_loaded = 0;
 extern "C" unsigned char _binary_build_FreeSans_sfn_start[];
@@ -28,6 +30,18 @@ static void console_fill_rows(uint32_t y0, uint32_t rows, uint32_t color) {
     }
 }
 
+void console_set_target(uint8_t* ptr, int pitch, int width, int height) {
+    g_console.ptr = ptr;
+    g_console.pitch = pitch;
+    g_console.width = width;
+    g_console.height = height;
+    g_console.x = 0;
+    g_console.y = 0;
+    ssfn_dst.ptr = ptr;
+    ssfn_dst.p   = pitch;
+    ssfn_dst.w   = width;
+    ssfn_dst.h   = height;
+}
 
 const int FONT_HEIGHT = 16;
 const int FONT_WIDTH = 8;
@@ -49,6 +63,7 @@ void console_init(uint8_t* fb, uint32_t width, uint32_t height, uint32_t pitch) 
 }
 
 void console_clear(void) {
+    wm_mark_dirty();
     console_fill_rows(0, g_console.height, CONSOLE_BG);
     g_console.x = 0; g_console.y = 0;
 }
@@ -56,6 +71,8 @@ void console_clear(void) {
 
 void console_backspace(void) {
     if (!g_console.ptr) return;
+
+    wm_mark_dirty();
  
     if (g_console.x >= FONT_WIDTH) {
         g_console.x -= FONT_WIDTH;
@@ -97,6 +114,7 @@ void console_scroll(void) {
 
 void console_putc(char c) {
     if (!g_console.ptr || !g_font_loaded) return;
+    wm_mark_dirty();
  
     if (c == '\n') {
         g_console.x = 0;
@@ -135,7 +153,7 @@ int console_draw_glyph(uint32_t* target, int pitch_bytes, int x, int y,
 
     ssfn_dst.ptr = (uint8_t*)target;
     ssfn_dst.p   = pitch_bytes;
-    ssfn_dst.w   = g_console.width;   // clip bounds = screen dims
+    ssfn_dst.w = pitch_bytes / 4;   // clip bounds = screen dims
     ssfn_dst.h   = g_console.height;
     ssfn_dst.x   = x;
     ssfn_dst.y   = y;

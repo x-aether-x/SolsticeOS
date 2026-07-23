@@ -22,6 +22,7 @@ int strlen(const char* str);
 bool strcmp(const char *s1, const char *s2); // custom: returns true when equal
 char* strcpy(char* dest, const char* src);
 char* strcat(char* dest, const char* src);
+char *strdup (const char *s);
 
 void remap_pic(); // remap the PIC interrupt vectors
 

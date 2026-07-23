@@ -20,11 +20,8 @@ void gfx_init(FramebufferInfo* fb) {
     uint64_t backbuf_size = (uint64_t)fb_height * fb_pitch;
     uint64_t pages_needed = (backbuf_size + 4095) / 4096;
     
-    backbuffer = (uint32_t*)pmm_alloc_pages(pages_needed);
-    if (backbuffer == nullptr) {
-        printf("FATAL: could not allocate backbuffer (%llu pages)\n", pages_needed);
-        return;
-    }
+    (void)pages_needed;
+    backbuffer = (uint32_t*)0x1000000; 
     
     uint8_t* ptr = (uint8_t*)backbuffer;
     for (uint64_t i = 0; i < backbuf_size; i++) {
@@ -96,15 +93,20 @@ int gfx_get_height() {
 }
 
 void gfx_clear(uint32_t color) {
-    for (int i = 0; i < fb_width * fb_height; i++) {
-        backbuffer[i] = color;
+    for (int y = 0; y < fb_height; y++) {
+        uint32_t* row = backbuffer + y * (fb_pitch / 4);
+        for (int x = 0; x < fb_width; x++) row[x] = color;
     }
 }
 
 void gfx_present() {
     uint8_t* src = (uint8_t*)backbuffer;
     uint8_t* dst = (uint8_t*)framebuffer;
-    memcpy(framebuffer, backbuffer, fb_height * fb_pitch);
+    for (int row = 0; row < fb_height; row++) {
+        memcpy(dst, src, fb_pitch);
+        src += fb_pitch;
+        dst += fb_pitch;
+    }
 }
 
 void gfx_draw_cursor() {

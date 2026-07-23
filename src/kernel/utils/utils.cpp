@@ -6,6 +6,8 @@
 #include "memory.h"
 #include "timer.h"
 #include "gfx.h"
+#include "wm.h"
+#include "task.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -18,6 +20,7 @@
 
 static int row = 0, col = 0;
 
+#define SERIAL_PORT 0x3F8
 #define ROOT_INODE 2
 
 // #define MAX_ROWS 2000 // max history rows
@@ -41,7 +44,19 @@ bool is_number(const char* str) {
     return true;
 }
 
-
+void _putchar(char c) {
+    while ((inb(SERIAL_PORT + 5) & 0x20) == 0);
+    outb(SERIAL_PORT, c);
+}
+void serial_print(const char* s) {
+    for (; *s; s++) _putchar(*s);
+}
+void serial_hex(uint64_t v) {
+    const char* digits = "0123456789ABCDEF";
+    _putchar('0'); _putchar('x');
+    for (int i = 60; i >= 0; i -= 4) _putchar(digits[(v >> i) & 0xF]);
+    _putchar('\n');
+}
 // ---------------- MEMORY OPERATIONS ----------------
 
 extern "C" void memset(void *dest, char val, uint64_t count) {
@@ -358,6 +373,15 @@ uint32_t string_to_int(const char* str) {
     return ret;
 }
 
+char *strdup(const char *src) {
+    size_t len = strlen(src) + 1;
+    char *dst = (char*)kmalloc(len);
+    if (dst != NULL) {
+        memcpy(dst, src, len);
+    }
+    return dst;
+}
+
 const char* next_arg(const char* str) {
     while (*str == ' ') str++;
     return str;
@@ -375,7 +399,7 @@ void execute_command(const char* command) {
         vga_print("cd <DIR> - Change directory (cd .. to go up, cd / or bare cd for root)\n", 0xFF, 0x00);
         vga_print("mkdir <DIR_NAME> - Creates a new directory with a specified name at a given directory (current dir by default)\n", 0xFF, 0x00);
         vga_print("sleep <SECONDS> - Sleep for the given number of seconds\n", 0xFF, 0x00);
-        vga_print("testgfx - Prints a quick test for the GFX, which tests different gfx functions. (run clear command after)\n", 0xff, 0x00);
+        vga_print("startwm - Starts up the window manager \n", 0xff, 0x00);
     }
     
     else if (strcmp(command, "clear") == true) {
@@ -441,12 +465,18 @@ void execute_command(const char* command) {
             ext2_mkdir(dir_name, 0x1F0);
         }
     }
-    else if (strcmp(command, "testgfx") == true) {
-        gfx_fill_rect(100, 100, 200, 150, 0xFF0000FF); // blue rect
-        gfx_draw_rect(50, 50, 300, 250, 1, 0xFF00FF00);   // green outline
-        gfx_draw_string(60, 60, "Hello from GFX", 0xFFFFFF00, 0xFF000000); // yellow text
-        gfx_present();
-    } 
+    else if (strcmp(command, "startwm") == true) {
+        serial_print("creating window\n");
+        console_window = wm_create_window("Terminal", 40, 60, 640, 400);
+        serial_hex((uint64_t)console_window);
+        serial_hex((uint64_t)console_window->buffer);
+        serial_print("set target\n");
+        console_set_target((uint8_t*)console_window->buffer, console_window->width * 4, console_window->width, console_window->height);
+        serial_print("clearing\n");
+        console_clear();
+        task_create(wm_task);
+        serial_print("done\n");
+        }
     else {
         vga_print("Unknown command: ", 0xFF, 0x00);
         vga_print(command, 0xFF, 0x00);
@@ -456,6 +486,7 @@ void execute_command(const char* command) {
 }
 
 // ----------------- MISC -------------------
+
 
 void remap_pic() {
     outb(PIC1_COMMAND, 0x11); // init in cascade mode

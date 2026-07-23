@@ -7,6 +7,8 @@
 #include "memory.h"
 #include "timer.h"
 #include "gfx.h"
+#include "wm.h"
+#include "task.h"
 
 #define SERIAL_PORT 0x3F8
 
@@ -21,11 +23,6 @@ void init_serial() {
     outb(SERIAL_PORT + 4, 0x0B);
 }
 
-void _putchar(char c) {
-    while ((inb(SERIAL_PORT + 5) & 0x20) == 0);
-    outb(SERIAL_PORT, c);
-}
-
 extern "C" int kernel_entry(FramebufferInfo* fb_info_ptr) {
     FramebufferInfo* fb_info = (FramebufferInfo*)fb_info_ptr;
     if (fb_info && fb_info->BaseAddress != 0) {
@@ -36,15 +33,17 @@ extern "C" int kernel_entry(FramebufferInfo* fb_info_ptr) {
     initGdt();
     initIdt();
     remap_pic();
-    init_paging();
 
     if (fb_info) {
         init_pmm((uint32_t)fb_info->MapSize, (uint32_t)fb_info->DescSize);
     }
     init_kmalloc();
+    init_paging();
+    init_tasking();
     gfx_init(fb_info);
     init_timer(1000);
     init_mouse();
+    
 
     asm volatile ("sti");
 

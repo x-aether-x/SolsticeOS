@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 #define MEM_MAP 0x80000ULL
-#define NUM_CACHES 6
+#define NUM_CACHES 9
 
 KmemCache kmem_caches[NUM_CACHES];
 
@@ -126,6 +126,7 @@ void init_paging() {
     identity_map_range((uint64_t)_kernel_start, kernel_size); // map the kernel
     identity_map_range(fb->BaseAddress, (uint64_t)fb->Height * fb->Pitch); // map the framebuffer
     identity_map_range(0x9000, 4096);
+    identity_map_range(0x1000000, 0x2000000);
 }
 
 void* pmm_alloc_pages(uint64_t count) {
@@ -143,7 +144,7 @@ void* pmm_alloc_pages(uint64_t count) {
 // -------------- SLAB ALLOCATOR ------------------
 
 void init_kmalloc() {
-    const uint32_t sizes[NUM_CACHES] = { 32, 64, 128, 256, 512, 1024 };
+    const uint32_t sizes[NUM_CACHES] = { 32, 64, 128, 256, 512, 1024, 2048, 5096, 10192};
     for (int i = 0; i < NUM_CACHES; i++) {
         kmem_caches[i].object_size = sizes[i];
         kmem_caches[i].first_slab = nullptr;

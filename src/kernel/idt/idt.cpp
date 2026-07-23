@@ -207,7 +207,7 @@ extern "C" void interrupt_handler(struct registers* regs) {
 
     if (regs->int_no == 32) {
         timer_ticks++;
-        if (timer_ticks % 10 == 0) schedule();
+        if (timer_ticks % 1 == 0) schedule();
         // print every 1000 ticks (1 second)
         // if (timer_ticks % 1000 == 0) {
             // printf("Uptime: %d seconds\n", (int)(timer_ticks / 1000));

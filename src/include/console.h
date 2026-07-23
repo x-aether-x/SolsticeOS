@@ -36,3 +36,4 @@ void console_backspace();
 void console_putc(char c);
 void console_puts(const char* s);
 int console_draw_glyph(uint32_t* target, int pitch_bytes, int x, int y, char c, uint32_t fg, uint32_t bg);
+void console_set_target(uint8_t* ptr, int pitch, int width, int height); 
