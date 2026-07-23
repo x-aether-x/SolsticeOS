@@ -9,12 +9,18 @@
 #include "ext2.h"
 #include "timer.h"
 #include "task.h"
+#include "cursor.h"
+#include "gfx.h"
 
 #define MAX_COMMAND_LEN 256
 
 char shell_buffer[MAX_COMMAND_LEN];
 int buffer_index = 0;
 bool shift_pressed = false;
+
+volatile int mouse_x = 100;
+volatile int mouse_y = 100;
+volatile uint8_t mouse_buttons = 0;
 
 static const char scancodes_ascii[128] = {
     0,  27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',   /* Backspace */
@@ -168,18 +174,36 @@ extern "C" void interrupt_handler(struct registers* regs) {
     if (regs->int_no >= 0x28) outb(0xA0, 0x20);
     outb(0x20, 0x20); 
 
-    if (regs->int_no == 44) {
+        if (regs->int_no == 44) {
         uint8_t status = inb(PS2_STATUS_PORT);
         if (!(status & 0x20)) return; // ensure mouse data is being sent
 
-        mouse_packet[mouse_cycle++] = inb(PS2_DATA_PORT);
+        uint8_t data = inb(PS2_DATA_PORT);
+
+        // if all 3 bits arent set, stream is desynced
+        if (mouse_cycle == 0 && !(data & 0x08)) return;
+
+        mouse_packet[mouse_cycle++] = (int8_t)data;
+
         if (mouse_cycle == 3) {
             mouse_cycle = 0;
-            // packet[0]: Flags (buttons, signs)
-            // packet[1]: X movement
-            // packet[2]: Y movement
+
+            uint8_t flags = (uint8_t)mouse_packet[0];
+            if (flags & 0xC0) return; // x or y overflow - discard packet
+
+            mouse_buttons = flags & 0x07;
+
+            mouse_x += mouse_packet[1];
+            mouse_y -= mouse_packet[2];
+
+            int max_x = gfx_get_width() - 1;
+            int max_y = gfx_get_height() - 1;
+            if (mouse_x < 0) mouse_x = 0;
+            if (mouse_y < 0) mouse_y = 0;
+            if (mouse_x > max_x) mouse_x = max_x;
+            if (mouse_y > max_y) mouse_y = max_y;
         }
-    }
+    } 
 
     if (regs->int_no == 32) {
         timer_ticks++;

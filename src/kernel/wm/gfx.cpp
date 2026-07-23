@@ -4,6 +4,7 @@
 #include "console.h"
 #include "utils.h"
 #include "printf.h"
+#include "cursor.h"
 
 static uint32_t* backbuffer = nullptr;
 static uint32_t* framebuffer = nullptr;
@@ -47,11 +48,11 @@ void gfx_fill_rect(int x, int y, int w, int h, uint32_t color) {
     }
 }
 
-void gfx_draw_rect(int x, int y, int w, int h, uint32_t color) {
-    gfx_fill_rect(x, y, w, 1, color); // top
-    gfx_fill_rect(x, y + h - 1, w, 1, color); // bottom
-    gfx_fill_rect(x, y, 1, h, color); // left
-    gfx_fill_rect(x + w - 1, y, 1, h, color); // right
+void gfx_draw_rect(int x, int y, int w, int h, int thickness, uint32_t color) {
+    gfx_fill_rect(x, y, w, thickness, color); // top
+    gfx_fill_rect(x, y + h - thickness, w, thickness, color); // bottom
+    gfx_fill_rect(x, y, thickness, h, color); // left
+    gfx_fill_rect(x + w - thickness, y, thickness, h, color); // right
 }
 
 void gfx_blit(int dst_x, int dst_y, uint32_t* src, int w, int h) {
@@ -104,4 +105,17 @@ void gfx_present() {
     uint8_t* src = (uint8_t*)backbuffer;
     uint8_t* dst = (uint8_t*)framebuffer;
     memcpy(framebuffer, backbuffer, fb_height * fb_pitch);
+}
+
+void gfx_draw_cursor() {
+    int mx = mouse_x, my = mouse_y;
+    // draws a trianglish cursor shape
+    for (int r = 0; r < 13; r++) {
+        int len = 13 - r;
+        gfx_fill_rect(mx - 1, my + r - 1, len + 2, 1, 0xFF000000);
+    }
+    for (int r = 0; r < 12; r++) {
+        int len = 12 - r;
+        gfx_fill_rect(mx, my + r, len, 1, 0xFFFFFFFF);
+    }
 }

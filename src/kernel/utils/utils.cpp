@@ -443,8 +443,8 @@ void execute_command(const char* command) {
     }
     else if (strcmp(command, "testgfx") == true) {
         gfx_fill_rect(100, 100, 200, 150, 0xFF0000FF); // blue rect
-        gfx_draw_rect(50, 50, 300, 250, 0xFF00FF00);   // green outline
-        gfx_draw_string(60, 60, "Hello GFX", 0xFFFFFF00, 0xFF000000); // yellow text
+        gfx_draw_rect(50, 50, 300, 250, 1, 0xFF00FF00);   // green outline
+        gfx_draw_string(60, 60, "Hello from GFX", 0xFFFFFF00, 0xFF000000); // yellow text
         gfx_present();
     } 
     else {
