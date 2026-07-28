@@ -466,16 +466,11 @@ void execute_command(const char* command) {
         }
     }
     else if (strcmp(command, "startwm") == true) {
-        serial_print("creating window\n");
         console_window = wm_create_window("Terminal", 40, 60, 640, 400);
-        serial_hex((uint64_t)console_window);
-        serial_hex((uint64_t)console_window->buffer);
-        serial_print("set target\n");
         console_set_target((uint8_t*)console_window->buffer, console_window->width * 4, console_window->width, console_window->height);
-        serial_print("clearing\n");
         console_clear();
+        asm volatile("" ::: "memory"); // ensure window setup is visible before the task runs
         task_create(wm_task);
-        serial_print("done\n");
         }
     else {
         vga_print("Unknown command: ", 0xFF, 0x00);

@@ -16,5 +16,6 @@ extern Window* console_window;
 
 void wm_draw();
 void wm_mark_dirty();
+void wm_mark_dirty_rect(int x, int y, int w, int h);
 void wm_task();
 Window* wm_create_window(const char* title, int x, int y, int w, int h);

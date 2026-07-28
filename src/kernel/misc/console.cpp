@@ -9,12 +9,27 @@
 #define SSFN_IMPLEMENTATION
 #include "ssfn.h"
 #include "utils.h"
-
-extern void wm_mark_dirty();
+ 
+extern void wm_mark_dirty(); // whole-screen redraw
+extern void wm_mark_dirty_rect(int x, int y, int w, int h);
+struct Window; extern Window* console_window;
+// mark just the console window's area (falls back to full screen if no window yet)
+static void console_dirty();
 
 static struct console_buffer g_console;
 static int g_font_loaded = 0;
 extern "C" unsigned char _binary_build_FreeSans_sfn_start[];
+
+// defined here, uses wm globals; declared above
+#include "wm.h"
+static void console_dirty() {
+    if (console_window) {
+        wm_mark_dirty_rect(console_window->x, console_window->y - 24,
+                           console_window->width, console_window->height + 24);
+    } else {
+        wm_mark_dirty();
+    }
+}
 
 #define CONSOLE_BG (vga_palette[0])
 
@@ -63,7 +78,7 @@ void console_init(uint8_t* fb, uint32_t width, uint32_t height, uint32_t pitch) 
 }
 
 void console_clear(void) {
-    wm_mark_dirty();
+    console_dirty();
     console_fill_rows(0, g_console.height, CONSOLE_BG);
     g_console.x = 0; g_console.y = 0;
 }
@@ -71,8 +86,7 @@ void console_clear(void) {
 
 void console_backspace(void) {
     if (!g_console.ptr) return;
-
-    wm_mark_dirty();
+    console_dirty();
  
     if (g_console.x >= FONT_WIDTH) {
         g_console.x -= FONT_WIDTH;
@@ -114,7 +128,7 @@ void console_scroll(void) {
 
 void console_putc(char c) {
     if (!g_console.ptr || !g_font_loaded) return;
-    wm_mark_dirty();
+    console_dirty();
  
     if (c == '\n') {
         g_console.x = 0;
@@ -139,8 +153,7 @@ void console_putc(char c) {
 
 void console_puts(const char* s) { for (; *s; s++) console_putc(*s); }
 
-int console_draw_glyph(uint32_t* target, int pitch_bytes, int x, int y,
-                          char c, uint32_t fg, uint32_t bg) {
+int console_draw_glyph(uint32_t* target, int pitch_bytes, int x, int y, char c, uint32_t fg, uint32_t bg) {
     // save whatever the console was using
     uint8_t* saved_ptr   = ssfn_dst.ptr;
     int      saved_p     = ssfn_dst.p;
@@ -153,8 +166,8 @@ int console_draw_glyph(uint32_t* target, int pitch_bytes, int x, int y,
 
     ssfn_dst.ptr = (uint8_t*)target;
     ssfn_dst.p   = pitch_bytes;
-    ssfn_dst.w = pitch_bytes / 4;   // clip bounds = screen dims
-    ssfn_dst.h   = g_console.height;
+    ssfn_dst.w   = pitch_bytes / 4; 
+    ssfn_dst.h   = 100000;
     ssfn_dst.x   = x;
     ssfn_dst.y   = y;
     ssfn_dst.fg  = fg;
@@ -162,7 +175,7 @@ int console_draw_glyph(uint32_t* target, int pitch_bytes, int x, int y,
 
     ssfn_putc((uint32_t)(unsigned char)c);
 
-    int advance = ssfn_dst.x - x;   // how far the glyph moved the cursor
+    int advance = ssfn_dst.x - x;
 
     ssfn_dst.ptr = saved_ptr;
     ssfn_dst.p   = saved_p;
@@ -173,5 +186,5 @@ int console_draw_glyph(uint32_t* target, int pitch_bytes, int x, int y,
     ssfn_dst.fg  = saved_fg;
     ssfn_dst.bg  = saved_bg;
 
-    return advance > 0 ? advance : 8;  // fall back if the font didn't advance
+    return advance > 0 ? advance : 8;
 }

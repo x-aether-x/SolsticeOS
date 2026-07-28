@@ -11,6 +11,16 @@ static uint32_t* framebuffer = nullptr;
 static int fb_width = 0, fb_height = 0;
 static int fb_pitch = 0; // in bytes
 
+// current clip rectangle: all drawing is confined to this box
+static int clip_x0 = 0, clip_y0 = 0, clip_x1 = 1 << 30, clip_y1 = 1 << 30;
+
+void gfx_set_clip(int x, int y, int w, int h) {
+    clip_x0 = x; clip_y0 = y; clip_x1 = x + w; clip_y1 = y + h;
+}
+void gfx_reset_clip() {
+    clip_x0 = 0; clip_y0 = 0; clip_x1 = fb_width; clip_y1 = fb_height;
+}
+
 void gfx_init(FramebufferInfo* fb) {
     fb_width = fb->Width;
     fb_height = fb->Height;
@@ -21,7 +31,7 @@ void gfx_init(FramebufferInfo* fb) {
     uint64_t pages_needed = (backbuf_size + 4095) / 4096;
     
     (void)pages_needed;
-    backbuffer = (uint32_t*)0x1000000; 
+    backbuffer = (uint32_t*)0x1000000; // reserved contiguous graphics heap
     
     uint8_t* ptr = (uint8_t*)backbuffer;
     for (uint64_t i = 0; i < backbuf_size; i++) {
@@ -30,11 +40,18 @@ void gfx_init(FramebufferInfo* fb) {
 }
 
 void gfx_fill_rect(int x, int y, int w, int h, uint32_t color) {
-    // cut off at screen boundary
-    if (x < 0) { w += x; x = 0; }
-    if (y < 0) { h += y; y = 0; }
-    if (x + w > fb_width) w = fb_width - x;
-    if (y + h > fb_height) h = fb_height - y;
+    int x0 = x, y0 = y, x1 = x + w, y1 = y + h;
+    // intersect with screen
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > fb_width) x1 = fb_width;
+    if (y1 > fb_height) y1 = fb_height;
+    // intersect with the active clip rectangle
+    if (x0 < clip_x0) x0 = clip_x0;
+    if (y0 < clip_y0) y0 = clip_y0;
+    if (x1 > clip_x1) x1 = clip_x1;
+    if (y1 > clip_y1) y1 = clip_y1;
+    x = x0; y = y0; w = x1 - x0; h = y1 - y0;
     if (w <= 0 || h <= 0) return;
     
     for (int row = 0; row < h; row++) {
@@ -53,18 +70,17 @@ void gfx_draw_rect(int x, int y, int w, int h, int thickness, uint32_t color) {
 }
 
 void gfx_blit(int dst_x, int dst_y, uint32_t* src, int w, int h) {
-    // cioues src buffer into backbuffer
-    if (dst_x < 0) { w += dst_x; src += -dst_x; dst_x = 0; }
-    if (dst_y < 0) { h += dst_y; src += (-dst_y) * w; dst_y = 0; }
-    if (dst_x + w > fb_width) w = fb_width - dst_x;
-    if (dst_y + h > fb_height) h = fb_height - dst_y;
-    if (w <= 0 || h <= 0) return;
-    
+    int src_w = w; // stride of the source buffer (unchanged by clipping)
     for (int row = 0; row < h; row++) {
-        uint32_t* dst = backbuffer + (dst_y + row) * (fb_pitch / 4) + dst_x;
-        uint32_t* s = src + row * w;
+        int py = dst_y + row;
+        if (py < 0 || py >= fb_height) continue;
+        if (py < clip_y0 || py >= clip_y1) continue;
+        uint32_t* s = src + row * src_w;
         for (int col = 0; col < w; col++) {
-            dst[col] = s[col];
+            int px = dst_x + col;
+            if (px < 0 || px >= fb_width) continue;
+            if (px < clip_x0 || px >= clip_x1) continue;
+            backbuffer[py * (fb_pitch / 4) + px] = s[col];
         }
     }
 }
@@ -106,6 +122,20 @@ void gfx_present() {
         memcpy(dst, src, fb_pitch);
         src += fb_pitch;
         dst += fb_pitch;
+    }
+}
+
+void gfx_present_rect(int x, int y, int w, int h) {
+    if (x < 0) { w += x; x = 0; }
+    if (y < 0) { h += y; y = 0; }
+    if (x + w > fb_width) w = fb_width - x;
+    if (y + h > fb_height) h = fb_height - y;
+    if (w <= 0 || h <= 0) return;
+    int stride = fb_pitch / 4;
+    for (int row = 0; row < h; row++) {
+        uint32_t* s = backbuffer + (y + row) * stride + x;
+        uint32_t* d = framebuffer + (y + row) * stride + x;
+        for (int col = 0; col < w; col++) d[col] = s[col];
     }
 }
 
