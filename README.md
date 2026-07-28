@@ -24,6 +24,8 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
   
   sleep \<SECONDS\> - Pauses the kernel for a user specified number of seconds
 
+  startwm - Starts the window manager process with a base terminal window initialised
+
 ### Dependencies
 
 [mkisofs](https://wiki.osdev.org/Mkisofs)
