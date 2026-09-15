@@ -19,7 +19,7 @@ typedef void (*KernelEntry)(VOID*);
 
 extern "C" EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
     SystemTable->ConOut->ClearScreen(SystemTable->ConOut);  
-    SystemTable->ConOut->OutputString(SystemTable->ConOut, (CHAR16*)L"[START] Booting sequence started...b\n");
+    SystemTable->ConOut->OutputString(SystemTable->ConOut, (CHAR16*)L"[START] Booting sequence started...\n");
 
     // locate loaded image
     EFI_LOADED_IMAGE_PROTOCOL *loaded_image;

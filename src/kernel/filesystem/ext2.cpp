@@ -14,6 +14,9 @@ static uint32_t g_block_size;
 #define INODE_SIZE 128
 #define INODES_PER_BLOCK (1024 / INODE_SIZE)
 
+#define EXT2_S_IFREG 0x8000  // normal file
+#define EXT2_FT_REG_FILE 1
+
 static bool g_ext2_initialized = false;
 
 uint32_t g_current_dir = 2; 
@@ -470,5 +473,158 @@ bool ext2_mkdir(const char* path, uint16_t port) {
     }
 
     vga_print("Directory created successfully!\n", 0x0A, 0x00);
+    return true;
+}
+
+
+bool ext2_touch(const char* path, uint16_t port) {
+    if (!ext2_init(0, port)) {
+        vga_print("Error: Filesystem not initialized!\n", 0x04, 0x00);
+        return false;
+    }
+ 
+    uint32_t parent_inode_num = 0;
+    char file_name[256];
+ 
+    // check if file already exists
+    uint32_t existing_inode = ext2_traverse_path(path, port, &parent_inode_num, file_name);
+    
+    if (existing_inode != 0) {
+        vga_print("touch: File already exists\n", 0x04, 0x00);
+        return false;
+    }
+    
+    if (parent_inode_num == 0) {
+        vga_print("touch: cannot create file: No such parent directory\n", 0x04, 0x00);
+        return false;
+    }
+ 
+    // allocate new inode for the file
+    uint32_t new_inode_num = ext2_alloc_inode(port);
+    if (new_inode_num == 0) {
+        vga_print("touch: No free inodes.\n", 0x04, 0x00);
+        return false;
+    }
+ 
+    // create the inode
+    ext2_inode new_inode;
+    memset(&new_inode, 0, sizeof(ext2_inode));
+    
+    new_inode.i_mode = EXT2_S_IFREG | 0x01A4;  // regular file
+    new_inode.i_size = 0;                       // empty file
+    new_inode.i_blocks = 0;                     // no blocks needed
+    new_inode.i_links_count = 1;
+ 
+    ext2_write_inode(new_inode_num, &new_inode, port);
+ 
+    // link file to parent dir
+    bool linked = ext2_link_dir_entry(parent_inode_num, file_name, new_inode_num, EXT2_FT_REG_FILE, port);
+    if (!linked) {
+        vga_print("touch: Failed to link file to parent directory.\n", 0x04, 0x00);
+        return false;
+    }
+ 
+    vga_print("File created successfully!\n", 0x0A, 0x00);
+    return true;
+}
+
+void ext2_free_inode(uint32_t inode_num, uint16_t port) {
+    uint8_t bitmap[1024];
+    ext2_read_block(BG_INODE_BITMAP_BLOCK, bitmap, port);
+ 
+    uint32_t index = inode_num - 1;
+    uint32_t byte_idx = index / 8;
+    uint32_t bit_idx = index % 8;
+ 
+    bitmap[byte_idx] &= ~(1 << bit_idx);
+    ext2_write_block(BG_INODE_BITMAP_BLOCK, bitmap, port);
+}
+ 
+void ext2_free_block(uint32_t block_num, uint16_t port) {
+    uint8_t bitmap[1024];
+    ext2_read_block(BG_BLOCK_BITMAP_BLOCK, bitmap, port);
+ 
+    uint32_t index = block_num - 1;
+    uint32_t byte_idx = index / 8;
+    uint32_t bit_idx = index % 8;
+ 
+    bitmap[byte_idx] &= ~(1 << bit_idx);
+    ext2_write_block(BG_BLOCK_BITMAP_BLOCK, bitmap, port);
+}
+
+bool ext2_unlink_dir_entry(uint32_t parent_inode_num, const char* name, uint16_t port) {
+    ext2_inode parent_inode;
+    ext2_read_inode(parent_inode_num, &parent_inode, port);
+ 
+    uint32_t dir_block = parent_inode.i_block[0];
+    uint8_t block_buffer[1024];
+    ext2_read_block(dir_block, block_buffer, port);
+ 
+    uint32_t offset = 0;
+    ext2_dir_entry* prev_entry = NULL;
+ 
+    while (offset < 1024) {
+        ext2_dir_entry* entry = (ext2_dir_entry*)(block_buffer + offset);
+ 
+        if (entry->rec_len == 0) break;
+        if (name_matches(entry, name)) {
+            // target found
+            if (prev_entry == NULL) {
+                // can't safely remove first entry so just clear index
+                entry->inode = 0;
+            } else {
+                prev_entry->rec_len += entry->rec_len;
+            }
+            ext2_write_block(dir_block, block_buffer, port);
+            return true;
+        }
+ 
+        prev_entry = entry;
+        offset += entry->rec_len;
+    }
+ 
+    return false;
+}
+
+bool ext2_rm(const char* path, uint16_t port) {
+    if (!ext2_init(0, port)) {
+        vga_print("Error: Filesystem not initialized!\n", 0x04, 0x00);
+        return false;
+    }
+ 
+    uint32_t parent_inode_num = 0;
+    char file_name[256];
+ 
+    uint32_t target_inode = ext2_traverse_path(path, port, &parent_inode_num, file_name);
+    
+    if (target_inode == 0) {
+        vga_print("rm: cannot remove: No such file or directory\n", 0x04, 0x00);
+        return false;
+    }
+ 
+    // check if its a file
+    ext2_inode target;
+    ext2_read_inode(target_inode, &target, port);
+ 
+    if ((target.i_mode & EXT2_S_IFDIR) != 0) {
+        vga_print("rm: cannot remove: Is a directory\n", 0x04, 0x00);
+        return false;
+    }
+ 
+    // free blocks used by the file
+    for (int i = 0; i < 12 && target.i_block[i] != 0; i++) {
+        ext2_free_block(target.i_block[i], port);
+    }
+ 
+    // unlink from parent directory
+    if (!ext2_unlink_dir_entry(parent_inode_num, file_name, port)) {
+        vga_print("rm: Failed to remove directory entry.\n", 0x04, 0x00);
+        return false;
+    }
+ 
+    // free the inode itsefl
+    ext2_free_inode(target_inode, port);
+ 
+    vga_print("File removed successfully!\n", 0x0A, 0x00);
     return true;
 }

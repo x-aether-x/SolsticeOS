@@ -147,3 +147,5 @@ uint32_t ext2_alloc_inode(uint16_t port);
 void ext2_read_inode(uint32_t inode_num, ext2_inode* buffer, uint16_t port);
 void ext2_write_inode(uint32_t inode_num, ext2_inode* inode_data, uint16_t port);
 const char* ext2_get_path();
+bool ext2_touch(const char* path, uint16_t port);
+bool ext2_rm(const char* path, uint16_t port);

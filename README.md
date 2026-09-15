@@ -21,14 +21,16 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
   ls \<DIR\> - Lists the contents of the current working directory by default, but can also view contents of other directories with an optional flag
 
   mkdir \<DIR_NAME\> - Creates a new directory at a user provided location
+
+  touch \<TARGET_LOCATION\> - Creates a new file at the provided location
+
+  rm \<TARGET\> - Removes a file (doesn't work for dirs)
   
   sleep \<SECONDS\> - Pauses the kernel for a user specified number of seconds
 
   startwm - Starts the window manager process with a base terminal window initialised
 
 ### Dependencies
-
-[mkisofs](https://wiki.osdev.org/Mkisofs)
 
 [nasm](https://www.nasm.us)
 

@@ -57,6 +57,61 @@ void serial_hex(uint64_t v) {
     for (int i = 60; i >= 0; i -= 4) _putchar(digits[(v >> i) & 0xF]);
     _putchar('\n');
 }
+
+static void serial_print_uint(uint64_t val, int base, bool upper) {
+    char buf[64];
+    int i = 0;
+    const char* digits = upper ? "0123456789ABCDEF" : "0123456789abcdef";
+    if (val == 0) { _putchar('0'); return; }
+    while (val > 0) { buf[i++] = digits[val % base]; val /= base; }
+    while (--i >= 0) _putchar(buf[i]);
+}
+
+static void serial_print_int(int64_t val) {
+    if (val < 0) { _putchar('-'); val = -val; }
+    serial_print_uint((uint64_t)val, 10, false);
+}
+
+void klog(LogLevel level, const char* fmt, ...) {
+    const char* color;
+    const char* tag;
+    switch (level) {
+        case LOG_OK:    color = "\x1b[32m"; tag = "  OK  "; break; // green
+        case LOG_WARN:  color = "\x1b[33m"; tag = " WARN "; break; // yellow
+        case LOG_ERROR: color = "\x1b[31m"; tag = " FAIL "; break; // red
+        default:        color = "\x1b[36m"; tag = " INFO "; break; // cyan
+    }
+
+    serial_print("\x1b[90m[\x1b[0m");
+    serial_print(color);
+    serial_print(tag);
+    serial_print("\x1b[0m\x1b[90m]\x1b[0m ");
+
+    va_list args;
+    va_start(args, fmt);
+
+    for (const char* p = fmt; *p != '\0'; p++) {
+        if (*p != '%') { _putchar(*p); continue; }
+
+        p++;
+        if (*p == '\0') break;
+
+        switch (*p) {
+            case 'c': _putchar((char)va_arg(args, int)); break;
+            case 'd': case 'i': serial_print_int(va_arg(args, int)); break;
+            case 'u': serial_print_uint(va_arg(args, unsigned int), 10, false); break;
+            case 'x': serial_print_uint(va_arg(args, unsigned int), 16, false); break;
+            case 'X': serial_print_uint(va_arg(args, unsigned int), 16, true); break;
+            case 'p': serial_print("0x"); serial_print_uint(va_arg(args, uintptr_t), 16, false); break;
+            case 's': serial_print(va_arg(args, const char*)); break;
+            case '%': _putchar('%'); break;
+            default: _putchar('%'); _putchar(*p); break;
+        }
+    }
+
+    va_end(args);
+    _putchar('\n');
+}
 // ---------------- MEMORY OPERATIONS ----------------
 
 extern "C" void memset(void *dest, char val, uint64_t count) {
@@ -398,6 +453,8 @@ void execute_command(const char* command) {
         vga_print("ls - Lists the contents of the current directory\n", 0xFF, 0x00);
         vga_print("cd <DIR> - Change directory (cd .. to go up, cd / or bare cd for root)\n", 0xFF, 0x00);
         vga_print("mkdir <DIR_NAME> - Creates a new directory with a specified name at a given directory (current dir by default)\n", 0xFF, 0x00);
+        vga_print("touch <TARGET_LOCATION> - Creates an empty file at a given location\n", 0xff, 0x00);
+        vga_print("rm <FILE> - Removes a file from a given location (does not work for directories)\n", 0xff, 0x00);
         vga_print("sleep <SECONDS> - Sleep for the given number of seconds\n", 0xFF, 0x00);
         vga_print("startwm - Starts up the window manager \n", 0xff, 0x00);
     }
@@ -463,6 +520,22 @@ void execute_command(const char* command) {
             vga_print("\n", 0xFF, 0x00);
 
             ext2_mkdir(dir_name, 0x1F0);
+        }
+    }
+    else if (starts_with(command, "rm") == true) {
+        const char* target = next_arg(command + 2);
+        if (strlen(target) == 0) {
+            vga_print("rm: missing operand\n", 0xFF, 0x00);
+        } else {
+            ext2_rm(target, 0x1F0);
+        }
+    }
+    else if (starts_with(command, "touch") == true) {
+        const char* target = next_arg(command + 5);
+        if (strlen(target) == 0) {
+            vga_print("touch: missing operand\n", 0xFF, 0x00);
+        } else {
+            ext2_touch(target, 0x1F0);
         }
     }
     else if (strcmp(command, "startwm") == true) {
