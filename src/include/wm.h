@@ -12,6 +12,7 @@ struct Window {
     bool in_use;
 };
 
+extern bool wm_running;
 extern Window* console_window;
 
 void wm_draw();

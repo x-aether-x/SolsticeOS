@@ -8,6 +8,8 @@
 #include "gfx.h"
 #include "wm.h"
 #include "task.h"
+#include "calculator.h"
+#include "xeyes.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -22,15 +24,6 @@ static int row = 0, col = 0;
 
 #define SERIAL_PORT 0x3F8
 #define ROOT_INODE 2
-
-// #define MAX_ROWS 2000 // max history rows
-// #define SCREEN_ROWS 25
-// #define SCREEN_COLS 80
-
-// // ---------------- SAVE CONSOLE HISTORY -----------------
-// uint16_t terminal_buffer[MAX_ROWS * SCREEN_COLS];
-// int current_total_rows = 0; // how many rows are filled?
-// int scroll_offset = 0;      // how many rows up are we from bottom?
 
 // ------------------ MISC ----------------------
 bool is_number(const char* str) {
@@ -112,6 +105,24 @@ void klog(LogLevel level, const char* fmt, ...) {
     va_end(args);
     _putchar('\n');
 }
+
+int int_sqrt(int value) {
+    if (value <= 0) return 0;
+    int res = 0;
+    int bit = 1 << 30;
+    while (bit > value) bit >>= 2;
+    while (bit != 0) {
+        if (value >= res + bit) {
+            value -= res + bit;
+            res = (res >> 1) + bit;
+        } else {
+            res >>= 1;
+        }
+        bit >>= 2;
+    }
+    return res;
+}
+
 // ---------------- MEMORY OPERATIONS ----------------
 
 extern "C" void memset(void *dest, char val, uint64_t count) {
@@ -445,7 +456,7 @@ const char* next_arg(const char* str) {
 // ----------------- SHELL FUNCTIONS/COMMANDS -----------------
 void execute_command(const char* command) {
     if (strcmp(command, "help") == true) {
-        vga_print("Available commands:\n", 0xFF, 0x00);
+        vga_print("Terminal commands:\n", 0xFF, 0x00);
         vga_print("help - Show this help message\n", 0xFF, 0x00);
         vga_print("clear - Clear the screen\n", 0xFF, 0x00);
         vga_print("echo <TEXT> - Display a line of text\n", 0xFF, 0x00);
@@ -457,6 +468,9 @@ void execute_command(const char* command) {
         vga_print("rm <FILE> - Removes a file from a given location (does not work for directories)\n", 0xff, 0x00);
         vga_print("sleep <SECONDS> - Sleep for the given number of seconds\n", 0xFF, 0x00);
         vga_print("startwm - Starts up the window manager \n", 0xff, 0x00);
+        vga_print("Apps (run by running command in window manager terminal):\n", 0xFF, 0x00);
+        vga_print("calculator - Opens up a calculator application in a new window", 0x0FF, 0x00);
+        vga_print("xeyes - graphical eyes that follow the mouse cursor", 0xFF, 0x00);
     }
     
     else if (strcmp(command, "clear") == true) {
@@ -538,10 +552,36 @@ void execute_command(const char* command) {
             ext2_touch(target, 0x1F0);
         }
     }
+    else if (strcmp(command, "calculator") == true) {
+        if (!wm_running) {
+            vga_print("calculator: window manager is not yet initialised\n", 0xFF, 0x00);
+            vga_print("start it by running ", 0xFF, 0x00);
+            vga_print("startwm\n", 0xCFF8F8, 0x00);
+        } else if (calc_window != nullptr) {
+            vga_print("calculator: calculator is already open\n", 0xFF, 0x00);
+        }
+        else {
+            calc_window = wm_create_window("Calculator", 400, 80, 176, 240);
+            task_create(calculator_task);
+        }
+    }
+    else if (strcmp(command, "xeyes") == true) {
+        if (!wm_running) {
+            vga_print("xeyes: window manager is not yet initialised\n", 0xFF, 0x00);
+            vga_print("start it by running ", 0xFF, 0x00);
+            vga_print("startwm\n", 0xCFF8F8, 0x00);
+        } else if (xeyes_window != nullptr) {
+            vga_print("xeyes: xeyes is already open\n", 0xFF, 0x00);
+        }
+        else {
+            xeyes_open();
+        }
+    }
     else if (strcmp(command, "startwm") == true) {
         console_window = wm_create_window("Terminal", 40, 60, 640, 400);
         console_set_target((uint8_t*)console_window->buffer, console_window->width * 4, console_window->width, console_window->height);
         console_clear();
+        wm_running = true;
         asm volatile("" ::: "memory"); // ensure window setup is visible before the task runs
         task_create(wm_task);
         }

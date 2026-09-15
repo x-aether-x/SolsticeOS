@@ -69,6 +69,55 @@ void gfx_draw_rect(int x, int y, int w, int h, int thickness, uint32_t color) {
     gfx_fill_rect(x + w - thickness, y, thickness, h, color); // right
 }
 
+static void gfx_draw_circle_row(int center_x, int row_y, int half_width, int thickness, uint32_t fill_color, uint32_t border_color) {
+    if (half_width < 0) return;
+
+    int start_x = center_x - half_width;
+    int total_width = 2 * half_width + 1;
+
+    if (thickness >= half_width + 1 || thickness == 0) {
+        gfx_fill_rect(start_x, row_y, total_width, 1, border_color);
+    } else {
+        // left border edge
+        gfx_fill_rect(start_x, row_y, thickness, 1, border_color);
+        // middle filled section
+        gfx_fill_rect(start_x + thickness, row_y, total_width - (2 * thickness), 1, fill_color);
+        // right border edge
+        gfx_fill_rect(start_x + total_width - thickness, row_y, thickness, 1, border_color);
+    }
+}
+
+void gfx_draw_circle(int xc, int yc, int radius, int thickness, uint32_t fill_color, uint32_t border_color) {
+    if (radius < 0) return;
+    if (thickness < 0) thickness = 0;
+
+    int x = 0;
+    int y = radius;
+    int d = 3 - (2 * radius);
+
+    gfx_draw_circle_row(xc, yc + y, x, thickness, fill_color, border_color);
+    gfx_draw_circle_row(xc, yc - y, x, thickness, fill_color, border_color);
+    gfx_draw_circle_row(xc, yc + x, y, thickness, fill_color, border_color);
+    gfx_draw_circle_row(xc, yc - x, y, thickness, fill_color, border_color);
+
+    // Bresenham loop
+    while (y >= x) {
+        if (d < 0) {
+            d = d + 4 * x + 6;
+        } else {
+            d = d + 4 * (x - y) + 10;
+            y--;
+        }
+        x++;
+
+        gfx_draw_circle_row(xc, yc + y, x, thickness, fill_color, border_color);
+        gfx_draw_circle_row(xc, yc - y, x, thickness, fill_color, border_color);
+        gfx_draw_circle_row(xc, yc + x, y, thickness, fill_color, border_color);
+        gfx_draw_circle_row(xc, yc - x, y, thickness, fill_color, border_color);
+    }
+}
+
+
 void gfx_blit(int dst_x, int dst_y, uint32_t* src, int w, int h) {
     int src_w = w; // stride of the source buffer (unchanged by clipping)
     for (int row = 0; row < h; row++) {

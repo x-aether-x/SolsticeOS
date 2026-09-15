@@ -18,3 +18,4 @@ void gfx_set_clip(int x, int y, int w, int h); // only draw in a certain region
 void gfx_reset_clip(); 
 void gfx_clear(uint32_t color); // fill backbuffer with a color
 void gfx_draw_cursor();
+void gfx_draw_circle(int xc, int yc, int radius, int thickness, uint32_t fill_color, uint32_t border_color);

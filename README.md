@@ -30,6 +30,10 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
 
   startwm - Starts the window manager process with a base terminal window initialised
 
+  calculator - Opens a calculator window process which you can interact with
+
+  xeyes - Opens an xeyes implementation
+
 ### Dependencies
 
 [nasm](https://www.nasm.us)

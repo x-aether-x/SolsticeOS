@@ -23,13 +23,11 @@ bool strcmp(const char *s1, const char *s2); // custom: returns true when equal
 char* strcpy(char* dest, const char* src);
 char* strcat(char* dest, const char* src);
 char *strdup (const char *s);
-
+int int_sqrt(int value);
 void remap_pic(); // remap the PIC interrupt vectors
 
 void kernel_panic(); // kernel_panic function that halts the system when an interrupt occurs
 
-// ---------------- SERIAL / COLOURED TERMINAL LOGGING ----------------
-// writes to COM1, which QEMU forwards to the host terminal via `-serial stdio`
 enum LogLevel { LOG_INFO, LOG_OK, LOG_WARN, LOG_ERROR };
 
 void serial_print(const char* s);
