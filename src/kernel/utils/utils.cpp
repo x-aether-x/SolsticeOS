@@ -467,9 +467,9 @@ void execute_command(const char* command) {
         vga_print("touch <TARGET_LOCATION> - Creates an empty file at a given location\n", 0xff, 0x00);
         vga_print("rm <FILE> - Removes a file from a given location (does not work for directories)\n", 0xff, 0x00);
         vga_print("sleep <SECONDS> - Sleep for the given number of seconds\n", 0xFF, 0x00);
-        vga_print("startwm - Starts up the window manager \n", 0xff, 0x00);
+        vga_print("startwm - Starts up the window manager \n\n", 0xff, 0x00);
         vga_print("Apps (run by running command in window manager terminal):\n", 0xFF, 0x00);
-        vga_print("calculator - Opens up a calculator application in a new window", 0x0FF, 0x00);
+        vga_print("calculator - Opens up a calculator application in a new window\n", 0x0FF, 0x00);
         vga_print("xeyes - graphical eyes that follow the mouse cursor", 0xFF, 0x00);
     }
     

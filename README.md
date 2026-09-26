@@ -34,6 +34,8 @@ NOTE: It is HIGHLY recommended to run this on linux, as all of these dependencie
 
   xeyes - Opens an xeyes implementation
 
+![What the OS looks like](images/demonstration.png)
+
 ### Dependencies
 
 [nasm](https://www.nasm.us)
